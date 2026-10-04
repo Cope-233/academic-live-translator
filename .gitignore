@@ -2,6 +2,7 @@
 .venv/
 data/
 models/
+runtime/
 cache/
 logs/
 
