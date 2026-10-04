@@ -173,13 +173,14 @@ async def _process_live_segment(websocket: WebSocket, send_lock: asyncio.Lock, s
     if not source:
         return
 
+    translation_context=_translation_context(session_id,cfg)
     segment=Segment(id=uuid.uuid4().hex[:10],start_ms=result.start_ms,end_ms=result.end_ms,source=source,translation="",language=detected)
     append_segment(session_id,segment)
     async with send_lock:
         await websocket.send_json({"type":"segment","phase":"asr","sequence":sequence,"segment":segment.model_dump()})
 
     try:
-        translation=await translate_text(source,cfg.translation,cfg.academic,context=_translation_context(session_id,cfg))
+        translation=await translate_text(source,cfg.translation,cfg.academic,context=translation_context)
         segment.translation=translation
         update_segment(session_id,segment)
         async with send_lock:
