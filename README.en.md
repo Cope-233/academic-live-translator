@@ -11,6 +11,7 @@ Academic Live Translator is a local-first WebUI for real-time transcription, tra
 ## Highlights
 
 - Real-time bilingual transcript workspace
+- Chinese WebUI by default, switchable to English in Settings
 - Browser microphone, browser tab/screen audio, Windows WASAPI loopback, and media-file input
 - Academic glossary profiles and custom terminology
 - Important / Question / Idea / Reference / Follow-up / Note markers
@@ -94,13 +95,13 @@ This option requires no API key and is intended to make first-run testing easy. 
 
 ## OpenAI-compatible providers
 
-Both ASR and translation can use compatible APIs. For example, a llama.cpp router hosting multiple models can use the same base URL for both providers:
+Both ASR and translation can use OpenAI Chat Completions compatible APIs. For example, a llama.cpp router hosting multiple models can use the same base URL for both providers:
 
 ```text
 ASR
 Base URL: http://127.0.0.1:8080/v1
 Model: <ASR model id>
-Mode: OpenAI /audio/transcriptions or Chat + input_audio
+Mode: OpenAI Chat Completions
 
 Translation
 Base URL: http://127.0.0.1:8080/v1
@@ -108,7 +109,7 @@ Model: <translation model id>
 Mode: OpenAI Chat Completions
 ```
 
-No dedicated llama.cpp mode is required.
+Remote ASR sends audio through Chat Completions `input_audio`, so the selected OpenAI-compatible service must support multimodal audio input.
 
 ## Live input options
 
@@ -120,6 +121,12 @@ No dedicated llama.cpp mode is required.
 - Audio / video files
 
 For online classes played by Chrome, Zoom, Teams, VLC, or similar applications on Windows, WASAPI loopback is usually the cleanest source because it captures the digital playback stream directly.
+
+## Language
+
+The WebUI defaults to Chinese. Switch to English from `Settings → Interface → Language`; the choice is saved automatically.
+
+Target languages currently include Chinese, English, Japanese, Korean, French, German, Spanish, and Arabic. Malay remains available as a source language but is no longer listed as a default translation target.
 
 ## Academic workflow
 
@@ -136,7 +143,7 @@ During a live session you can:
 
 `beta01` intentionally **does not automatically reuse** v0.1/v0.2/v0.3 AppData folders. This prevents surprising cross-version records and hidden C-drive usage.
 
-If you want to keep older sessions, copy the desired session JSON files and matching assets manually into the new portable `data/` directory after making a backup.
+Existing beta01 configs that used the earlier ASR mode names are automatically migrated to the unified `OpenAI Chat Completions` mode. A previous Malay target setting falls back to Chinese.
 
 ## Development
 
@@ -146,6 +153,8 @@ python -m venv .venv
 # Linux/macOS: .venv/bin/python -m pip install -r requirements-dev.txt
 pytest
 ```
+
+CI runs both Python tests and `node --check static/app.js` to catch WebUI JavaScript syntax errors.
 
 ## License
 
