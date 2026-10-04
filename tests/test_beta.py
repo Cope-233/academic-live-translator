@@ -4,7 +4,7 @@ from app.config import CACHE_DIR, DATA_DIR, MODELS_DIR, PROJECT_ROOT, _migrate_c
 
 
 def test_version():
-    assert __version__ == "beta01"
+    assert __version__ == "beta 0.1"
 
 
 def test_defaults():
