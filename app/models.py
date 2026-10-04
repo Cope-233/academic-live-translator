@@ -18,7 +18,7 @@ class ProviderConfig(BaseModel):
     timeout_seconds: float = 120.0
     temperature: float = 0.0
     max_tokens: int = 4096
-    device: Literal["auto","cpu","cuda"] = "auto"
+    device: Literal["auto","cpu","cuda","apple"] = "auto"
     compute_type: str = "auto"
     region: str = ""
 

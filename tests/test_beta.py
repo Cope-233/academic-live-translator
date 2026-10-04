@@ -7,11 +7,14 @@ from app import __version__
 from app.models import AppConfig
 from app.config import CACHE_DIR, DATA_DIR, MODELS_DIR, PROJECT_ROOT, _migrate_config
 from app.native_capture import NativeAudioCapture, NativeCaptureInfo, _capture_candidates
+from app import providers
+from app.models import ProviderConfig
 from app.providers import _bing_lang, _parse_bing_result
+from app import main
 
 
 def test_version():
-    assert __version__ == "beta 0.5"
+    assert __version__ == "beta 0.6"
 
 
 def test_defaults():
@@ -24,6 +27,47 @@ def test_defaults():
     assert cfg.asr.model == "base"
     assert cfg.translation.mode == "bing_web"
     assert cfg.academic.target_language == "Chinese"
+
+
+def test_apple_silicon_auto_uses_mlx_and_cpu_stays_cpu(monkeypatch):
+    monkeypatch.setattr(providers.sys, "platform", "darwin")
+    monkeypatch.setattr(providers.platform, "machine", lambda: "arm64")
+    monkeypatch.setattr(providers, "_mlx_whisper_available", lambda: True)
+
+    assert providers._whisper_device(ProviderConfig(device="auto")) == ("apple", "float16")
+    assert providers._whisper_device(ProviderConfig(device="cpu")) == ("cpu", "int8")
+    assert providers._whisper_device(ProviderConfig(device="apple")) == ("apple", "float16")
+    assert providers.supported_whisper_devices() == ["auto", "cpu", "apple"]
+
+
+def test_legacy_cuda_config_maps_to_apple_on_m_series_mac(monkeypatch):
+    monkeypatch.setattr(providers.sys, "platform", "darwin")
+    monkeypatch.setattr(providers.platform, "machine", lambda: "arm64")
+    monkeypatch.setattr(providers, "_mlx_whisper_available", lambda: True)
+
+    assert providers._whisper_device(ProviderConfig(device="cuda")) == ("apple", "float16")
+
+
+def test_apple_device_config_maps_to_cpu_off_apple_silicon(monkeypatch):
+    monkeypatch.setattr(providers.sys, "platform", "darwin")
+    monkeypatch.setattr(providers.platform, "machine", lambda: "x86_64")
+
+    assert providers._whisper_device(ProviderConfig(device="apple")) == ("cpu", "int8")
+
+
+def test_mlx_whisper_model_repositories_are_mapped():
+    assert providers.MLX_WHISPER_REPOS["base"] == "mlx-community/whisper-base-mlx"
+    assert providers.MLX_WHISPER_REPOS["large-v3-turbo"] == "mlx-community/whisper-large-v3-turbo"
+
+
+def test_audio_source_options_follow_platform(monkeypatch):
+    monkeypatch.setattr(main.sys, "platform", "darwin")
+    assert main.supported_audio_sources() == ["microphone", "browser_system", "browser_mix"]
+
+    monkeypatch.setattr(main.sys, "platform", "win32")
+    assert main.supported_audio_sources() == [
+        "microphone", "browser_system", "browser_mix", "native_system", "native_microphone"
+    ]
 
 
 def test_floating_window_bounds():

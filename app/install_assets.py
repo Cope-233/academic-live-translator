@@ -1,10 +1,4 @@
-"""Portable first-run installer for Academic Live Translator beta 0.5.
-
-Downloads the five supported Faster-Whisper models into project-local folders and,
-on Windows with an NVIDIA GPU, prepares the CUDA 12 cuBLAS/cuDNN runtime under
-runtime/cuda12/bin. No system CUDA Toolkit installation or global PATH change is
-required when the supplied launcher is used.
-"""
+"""Install platform-specific Whisper models and optional GPU runtimes."""
 from __future__ import annotations
 
 import os
@@ -15,7 +9,10 @@ import tempfile
 import urllib.request
 from pathlib import Path
 
-from .config import CACHE_DIR, DATA_DIR, MODELS_DIR, PROJECT_ROOT
+from .audio import pcm16_to_wav_bytes
+from .config import CACHE_DIR, DATA_DIR, MODELS_DIR, PROJECT_ROOT, load_config
+from .models import ProviderConfig
+from .providers import MLX_WHISPER_REPOS, _ensure_mlx_whisper_model, _is_apple_silicon, _local_whisper_transcribe
 
 WHISPER_MODELS = ("tiny", "base", "small", "medium", "large-v3-turbo")
 CUDA_RUNTIME_URL = (
@@ -24,7 +21,7 @@ CUDA_RUNTIME_URL = (
 )
 RUNTIME_DIR = PROJECT_ROOT / "runtime"
 CUDA_BIN = RUNTIME_DIR / "cuda12" / "bin"
-INSTALL_MARKER = DATA_DIR / ".installed-beta-0.5"
+INSTALL_MARKER = DATA_DIR / ".installed-beta-0.6"
 _DLL_HANDLES: list[object] = []
 
 
@@ -83,13 +80,13 @@ def _extract_cuda_archive(archive: Path, destination: Path) -> None:
         seven.extractall(path=destination)
 
 
-def download_whisper_models() -> None:
+def download_whisper_models(model_names: tuple[str, ...] = WHISPER_MODELS) -> None:
     from faster_whisper.utils import download_model
 
     root = MODELS_DIR / "faster-whisper"
     root.mkdir(parents=True, exist_ok=True)
     hf_cache = CACHE_DIR / "huggingface"
-    for name in WHISPER_MODELS:
+    for name in model_names:
         destination = root / name
         if (destination / "model.bin").exists():
             print(f"[setup] Whisper {name}: already installed")
@@ -149,15 +146,15 @@ def _consume(generator) -> None:
     list(generator)
 
 
-def self_test(cuda_installed: bool) -> None:
+def self_test(cuda_installed: bool, model_name: str = "tiny") -> None:
     import numpy as np
     from faster_whisper import WhisperModel
 
-    tiny = MODELS_DIR / "faster-whisper" / "tiny"
+    model_path = MODELS_DIR / "faster-whisper" / model_name
     silence = np.zeros(16000, dtype=np.float32)
 
     print("[setup] Self-test: Whisper CPU / int8 ...")
-    cpu = WhisperModel(str(tiny), device="cpu", compute_type="int8")
+    cpu = WhisperModel(str(model_path), device="cpu", compute_type="int8")
     segments, _ = cpu.transcribe(silence, language="en", beam_size=1, best_of=1)
     _consume(segments)
     del cpu
@@ -166,7 +163,7 @@ def self_test(cuda_installed: bool) -> None:
     if cuda_installed:
         print("[setup] Self-test: Whisper CUDA / float16 ...")
         try:
-            gpu = WhisperModel(str(tiny), device="cuda", compute_type="float16")
+            gpu = WhisperModel(str(model_path), device="cuda", compute_type="float16")
             segments, _ = gpu.transcribe(silence, language="en", beam_size=1, best_of=1)
             _consume(segments)
             del gpu
@@ -175,14 +172,58 @@ def self_test(cuda_installed: bool) -> None:
             raise RuntimeError(f"CUDA Whisper inference self-test failed: {exc}") from exc
 
 
+def self_test_apple_silicon(model_name: str) -> None:
+    if not _is_apple_silicon():
+        raise RuntimeError("Apple silicon setup was selected on a non-Apple-silicon Python runtime")
+    silence = pcm16_to_wav_bytes(b"\x00\x00" * 16000, 16000)
+    for device in ("cpu", "apple"):
+        cfg = ProviderConfig(model=model_name, device=device, compute_type="auto")
+        label = "CPU / int8" if device == "cpu" else "Apple GPU / MLX"
+        print(f"[setup] Self-test: Whisper {label} ...")
+        try:
+            _local_whisper_transcribe(silence, cfg, "en", "")
+        except Exception as exc:
+            raise RuntimeError(f"Whisper {label} inference self-test failed: {exc}") from exc
+        print(f"[setup] Self-test: Whisper {label} OK")
+
+
+def _installation_is_current() -> bool:
+    try:
+        return INSTALL_MARKER.read_text(encoding="utf-8").strip() == "beta 0.6"
+    except OSError:
+        return False
+
+
 def main() -> None:
     (CACHE_DIR / "temp").mkdir(parents=True, exist_ok=True)
-    print("[setup] Academic Live Translator beta 0.5 portable assets")
-    print("[setup] CPU runtime is provided by the installed CTranslate2/faster-whisper package.")
-    download_whisper_models()
-    cuda_installed = download_cuda_runtime()
-    self_test(cuda_installed)
-    INSTALL_MARKER.write_text("beta 0.5\n", encoding="utf-8")
+    if _installation_is_current():
+        print("[setup] beta 0.6 platform assets are already installed")
+        return
+
+    cfg = load_config()
+    print("[setup] Academic Live Translator beta 0.6 platform setup")
+    if sys.platform == "win32":
+        print("[setup] CPU runtime is provided by CTranslate2; checking optional NVIDIA CUDA runtime.")
+        download_whisper_models()
+        cuda_installed = download_cuda_runtime()
+        self_test(cuda_installed)
+    elif cfg.asr.mode != "local_whisper":
+        print("[setup] External ASR is configured; local Whisper model setup is skipped.")
+    elif _is_apple_silicon():
+        if cfg.asr.model not in MLX_WHISPER_REPOS:
+            raise RuntimeError(f"Unsupported Whisper model selected: {cfg.asr.model}")
+        print("[setup] Apple silicon detected; preparing MLX/Metal and CPU Whisper runtimes.")
+        download_whisper_models((cfg.asr.model,))
+        _ensure_mlx_whisper_model(cfg.asr.model)
+        self_test_apple_silicon(cfg.asr.model)
+    else:
+        print("[setup] Preparing the CPU Whisper runtime for this platform.")
+        download_whisper_models((cfg.asr.model,))
+        cpu_cfg = ProviderConfig(model=cfg.asr.model, device="cpu", compute_type="auto")
+        silence = pcm16_to_wav_bytes(b"\x00\x00" * 16000, 16000)
+        _local_whisper_transcribe(silence, cpu_cfg, "en", "")
+
+    INSTALL_MARKER.write_text("beta 0.6\n", encoding="utf-8")
     print("[setup] Portable installation complete.")
 
 

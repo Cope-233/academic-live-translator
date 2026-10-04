@@ -2,17 +2,17 @@
 
 [简体中文](./README.md) | **English**
 
-**beta 0.5 · WebUI · portable by default**
+**beta 0.6 · WebUI · portable by default**
 
 Academic Live Translator is a local-first WebUI for real-time transcription, translation, and academic session capture. It is designed for lectures, seminars, conferences, meetings, interviews, and recorded media.
 
 > Beta builds use `beta x.y` identifiers. Standard semantic versioning will begin with the first stable release.
 
-## beta 0.5: Whisper/Bing and Windows installer fixes
+## beta 0.6: Apple silicon Whisper acceleration
 
-beta 0.5 fixes beta 0.4's Windows CUDA runtime extraction failure, Whisper auto-CUDA inference failure, and a startup race where settings or capture actions could run before configuration loaded. The immediate Whisper transcript display and Bing response parsing were also verified through real provider and browser-audio tests.
+beta 0.6 adds native macOS setup and Apple silicon GPU inference through MLX / Metal. The installer detects the Mac chip and Python architecture, installs the matching MLX Whisper package, prepares the selected model, and runs CPU and Apple GPU inference checks. Automatic mode chooses MLX on Apple silicon, CUDA on Windows when an NVIDIA runtime is available, and CPU elsewhere.
 
-The Windows installer now extracts the CUDA bundle with the built-in `tar.exe`, because the archive uses the BCJ2 filter that `py7zr` does not support. It checks dependency and asset-install exit codes and requires the real CUDA inference self-test to pass before writing the completion marker. The app registers the project-local CUDA DLL directory itself, including when started directly. Native WASAPI capture now reports success when the device opens instead of waiting for the first audio frame, so quiet input is not mistaken for a startup failure.
+CPU mode remains available through Faster-Whisper / CTranslate2. Windows keeps its existing portable CUDA setup and all five Faster-Whisper models. On macOS, only the selected model is prepared during setup; other models download the matching MLX or Faster-Whisper files the first time they are selected. Existing beta 0.5 reliability fixes remain in place.
 
 ### Live pipeline fix
 
@@ -56,7 +56,7 @@ Or simply double-click:
 start_webui.bat
 ```
 
-If beta 0.5 has not been initialized yet, `start_webui.bat` automatically runs the full installer first and then starts the WebUI.
+If beta 0.6 has not been initialized yet, `start_webui.bat` automatically runs the full installer first and then starts the WebUI.
 
 The installer automatically:
 
@@ -72,6 +72,25 @@ The installer automatically:
 > A full install contains five Whisper models plus the optional CUDA runtime. Expect several gigabytes of downloads and disk use. The five models alone are roughly 4 GB; reserving at least 6 GB is recommended.
 
 The Windows CUDA runtime follows the local-library approach documented by Faster-Whisper and uses the [Purfview/whisper-standalone-win cuBLAS/cuDNN bundle](https://github.com/Purfview/whisper-standalone-win/releases/tag/libs).
+
+## macOS installation (Apple silicon)
+
+On an M1, M2, M3, or M4 Mac, open Terminal in the project folder and run:
+
+```bash
+chmod +x start_webui.sh
+./start_webui.sh
+```
+
+The launcher checks the chip and Python architecture, creates `.venv/`, installs MLX Whisper on native arm64 Python, and prepares the selected default model (`base` by default). First setup runs real CPU and Apple GPU / Metal inference checks. Models stay in the project folder. MLX uses [Apple's MLX Whisper implementation](https://github.com/ml-explore/mlx-examples/tree/main/whisper) and [MLX Community converted checkpoints](https://huggingface.co/mlx-community/whisper-base-mlx).
+
+In **Settings → ASR Provider → Device**, choose:
+
+- **Auto**: MLX / Metal on Apple silicon; CUDA on Windows with an available NVIDIA runtime; CPU otherwise.
+- **CPU**: Faster-Whisper / CTranslate2.
+- **Apple silicon GPU (MLX / Metal)**: shown only on supported M-series Macs.
+
+Other Whisper models download their platform-specific files when first selected. Intel Macs and Linux show Auto and CPU only. If setup reports a Python architecture mismatch on an M-series Mac, install an arm64 Python, remove the project `.venv/`, and start again.
 
 ## Starting the app
 
@@ -112,6 +131,8 @@ academic-live-translator/
 │     ├─ small/
 │     ├─ medium/
 │     └─ large-v3-turbo/
+│  └─ mlx-whisper/           # MLX models on Apple silicon
+│     └─ base/
 ├─ runtime/
 │  └─ cuda12/
 │     └─ bin/                 # project-local CUDA/cuDNN DLLs on Windows/NVIDIA
@@ -134,7 +155,7 @@ academic-live-translator/
 ## Highlights
 
 - Real-time bilingual transcript workspace
-- Local Faster-Whisper: tiny / base / small / medium / large-v3-turbo
+- Local Whisper: tiny / base / small / medium / large-v3-turbo (MLX on Apple silicon, Faster-Whisper on other platforms)
 - Bing Free, Microsoft Translator, and OpenAI-compatible translation providers
 - OpenAI-compatible llama.cpp, vLLM, LM Studio, LocalAI, and similar services
 - Browser microphone, tab/screen audio, and system-audio + microphone mix
@@ -150,11 +171,11 @@ academic-live-translator/
 
 ## Default providers
 
-### ASR: Local Faster-Whisper
+### ASR: Local Whisper
 
-The default model is `base`. A beta 0.5 full install prepares all five models in advance, so switching models later does not require another model download.
+The default model is `base`. The full Windows install prepares all five Faster-Whisper models. On Apple silicon, setup prepares the selected MLX model and the CPU model; other model sizes download on first use.
 
-CPU mode requires no CUDA. On Windows with an NVIDIA GPU, the one-click installer prepares the required runtime inside the project. Use the supplied launcher so `runtime/cuda12/bin` is added only to the application process PATH.
+Auto mode uses MLX / Metal on Apple silicon and CUDA on Windows with an NVIDIA GPU. CPU mode requires no GPU runtime. On Windows with an NVIDIA GPU, the one-click installer prepares the required runtime inside the project. Use the supplied launcher so `runtime/cuda12/bin` is added only to the application process PATH.
 
 ### Translation: Bing Free (Experimental)
 
@@ -184,7 +205,7 @@ On recent desktop Chrome/Edge builds, Document Picture-in-Picture can display th
 
 > The floating window is only a display layer. Keep the main WebUI tab open.
 
-## Linux / macOS
+## Linux / Intel Mac
 
 You can continue to use:
 
@@ -193,13 +214,13 @@ chmod +x start_webui.sh
 ./start_webui.sh
 ```
 
-Linux/macOS support browser microphone, tab/screen capture, and media-file workflows. Windows WASAPI capture and the Windows CUDA bundle do not apply; GPU runtime libraries must be prepared according to the selected platform.
+Linux and Intel Macs use CPU Whisper and support browser microphone, tab/screen capture, and media-file workflows. Windows WASAPI capture, the Windows CUDA bundle, and Apple MLX acceleration do not apply.
 
 ## Upgrading from older betas
 
-beta 0.5 keeps portable-by-default storage. Existing `data/config.json` and Sessions remain usable.
+beta 0.6 keeps portable-by-default storage. Existing `data/config.json` and Sessions remain usable. A saved Windows `cuda` choice maps to MLX / Metal on Apple silicon.
 
-On the first beta 0.5 start, the launcher checks for `data/.installed-beta-0.5`. If it is missing, the full installation flow runs automatically. Older Hugging Face caches are not deleted; all five supported Whisper models and the CUDA runtime are kept inside the project.
+On the first beta 0.6 start, the launcher checks for `data/.installed-beta-0.6` and runs the platform setup and inference checks if needed. Existing models, configuration, sessions, and caches are preserved.
 
 ## Development
 

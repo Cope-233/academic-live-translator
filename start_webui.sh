@@ -16,7 +16,19 @@ mkdir -p "$ALT_DATA_DIR" "$ALT_MODELS_DIR" "$ALT_CACHE_DIR" "$ALT_LOGS_DIR" "$HF
 if [[ ! -x .venv/bin/python ]]; then
   python3 -m venv .venv
 fi
+if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]]; then
+  PYTHON_ARCH="$(.venv/bin/python -c 'import platform; print(platform.machine())')"
+  if [[ "$PYTHON_ARCH" != "arm64" ]]; then
+    echo "[setup] This Mac has Apple silicon, but the selected Python is running as $PYTHON_ARCH. Install a native arm64 Python and remove .venv before retrying."
+    exit 1
+  fi
+fi
+.venv/bin/python -m pip install --disable-pip-version-check --upgrade pip
 .venv/bin/python -m pip install --disable-pip-version-check -r requirements.txt
-.venv/bin/python -m app.bootstrap
-echo "[start] Academic Live Translator beta 0.3 -> http://127.0.0.1:8765"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  .venv/bin/python -m app.install_assets
+else
+  .venv/bin/python -m app.bootstrap
+fi
+echo "[start] Academic Live Translator beta 0.6 -> http://127.0.0.1:8765"
 .venv/bin/python run.py

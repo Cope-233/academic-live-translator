@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import importlib
+import importlib.util
 import io
 import os
+import platform
 import re
 import sys
 import threading
 
 import httpx
 
-from .config import MODELS_DIR, PROJECT_ROOT
+from .config import CACHE_DIR, MODELS_DIR, PROJECT_ROOT
 from .models import AcademicConfig, ProviderConfig
 
 _ASR_PREFIX_RE = re.compile(r"^\s*language\s+[^<\r\n]+<asr_text>\s*", re.IGNORECASE)
@@ -20,6 +23,15 @@ _WHISPER_MODELS: dict[tuple[str, str, str], object] = {}
 _WHISPER_LOCK = threading.Lock()
 _WHISPER_INFER_LOCK = threading.Lock()
 _CUDA_DLL_HANDLE = None
+_MLX_MODEL_RUNTIME: tuple[str, str] | None = None
+
+MLX_WHISPER_REPOS = {
+    "tiny": "mlx-community/whisper-tiny-mlx",
+    "base": "mlx-community/whisper-base-mlx",
+    "small": "mlx-community/whisper-small-mlx",
+    "medium": "mlx-community/whisper-medium-mlx",
+    "large-v3-turbo": "mlx-community/whisper-large-v3-turbo",
+}
 
 
 def _enable_project_cuda_runtime() -> None:
@@ -74,15 +86,58 @@ async def close_http_client() -> None:
         await _HTTP_CLIENT.aclose()
     _HTTP_CLIENT = None
 
-def _whisper_device(cfg: ProviderConfig) -> tuple[str,str]:
-    device, compute = cfg.device, cfg.compute_type
-    if device == "auto":
-        try:
-            import ctranslate2
-            device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
-        except Exception:
+def _is_apple_silicon() -> bool:
+    return sys.platform == "darwin" and platform.machine().lower() in {"arm64", "aarch64"}
+
+
+def _mlx_whisper_available() -> bool:
+    return importlib.util.find_spec("mlx_whisper") is not None and importlib.util.find_spec("mlx") is not None
+
+
+def supported_whisper_devices() -> list[str]:
+    if sys.platform == "win32":
+        return ["auto", "cpu", "cuda"]
+    if _is_apple_silicon() and _mlx_whisper_available():
+        return ["auto", "cpu", "apple"]
+    return ["auto", "cpu"]
+
+
+def _whisper_device(cfg: ProviderConfig) -> tuple[str, str]:
+    requested = cfg.device
+    if requested == "auto":
+        if _is_apple_silicon() and _mlx_whisper_available():
+            device = "apple"
+        else:
+            try:
+                import ctranslate2
+
+                device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
+            except Exception:
+                device = "cpu"
+    elif requested == "apple":
+        if not _is_apple_silicon():
+            # Config files can move between machines; an unavailable device maps to CPU.
             device = "cpu"
-    if compute == "auto":
+        elif not _mlx_whisper_available():
+            raise RuntimeError("MLX Whisper is not installed. Re-run start_webui.sh with native Apple silicon Python.")
+        else:
+            device = "apple"
+    elif requested == "cuda":
+        # A configuration copied from Windows should use the native Mac backend when possible.
+        if _is_apple_silicon() and _mlx_whisper_available():
+            device = "apple"
+        elif sys.platform == "win32":
+            device = "cuda"
+        else:
+            device = "cpu"
+    else:
+        device = "cpu"
+
+    compute = cfg.compute_type
+    if device == "apple":
+        if compute not in {"float16", "float32"}:
+            compute = "float16"
+    elif compute == "auto":
         compute = "float16" if device == "cuda" else "int8"
     return device, compute
 
@@ -90,13 +145,72 @@ def _local_whisper_path(model_name: str):
     direct = MODELS_DIR / "faster-whisper" / model_name
     return direct if (direct / "model.bin").exists() else None
 
+
+def _local_mlx_whisper_path(model_name: str):
+    direct = MODELS_DIR / "mlx-whisper" / model_name
+    has_weights = (direct / "weights.npz").exists() or (direct / "weights.safetensors").exists()
+    return direct if (direct / "config.json").exists() and has_weights else None
+
+
+def _ensure_mlx_whisper_model(model_name: str) -> Path:
+    if model_name not in MLX_WHISPER_REPOS:
+        raise ValueError(f"Unsupported local Whisper model: {model_name}")
+    existing = _local_mlx_whisper_path(model_name)
+    if existing:
+        return existing
+
+    from huggingface_hub import snapshot_download
+
+    destination = MODELS_DIR / "mlx-whisper" / model_name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[setup] MLX Whisper {model_name}: downloading to {destination}")
+    snapshot_download(
+        repo_id=MLX_WHISPER_REPOS[model_name],
+        cache_dir=str(CACHE_DIR / "huggingface"),
+        local_dir=str(destination),
+    )
+    model_path = _local_mlx_whisper_path(model_name)
+    if not model_path:
+        raise RuntimeError(f"MLX Whisper model download incomplete: {model_name}")
+    return model_path
+
+
+def _mlx_model_reference(model_name: str) -> str:
+    local_path = _local_mlx_whisper_path(model_name)
+    return str(local_path) if local_path else MLX_WHISPER_REPOS[model_name]
+
+
+def _activate_mlx_gpu(compute_type: str) -> None:
+    global _MLX_MODEL_RUNTIME
+    import mlx.core as mx
+    mlx_transcribe = importlib.import_module("mlx_whisper.transcribe")
+
+    runtime = ("gpu", compute_type)
+    reload_model = mx.default_device() != mx.gpu or _MLX_MODEL_RUNTIME != runtime
+    if mx.default_device() != mx.gpu:
+        mx.set_default_device(mx.gpu)
+    if reload_model:
+        # mlx-whisper holds one model globally; reload it after a device or dtype change.
+        mlx_transcribe.ModelHolder.model = None
+        mlx_transcribe.ModelHolder.model_path = None
+    _MLX_MODEL_RUNTIME = runtime
+
+
 def get_local_whisper(cfg: ProviderConfig):
-    from faster_whisper import WhisperModel
     device, compute = _whisper_device(cfg)
     key = (cfg.model, device, compute)
     with _WHISPER_LOCK:
         if key in _WHISPER_MODELS:
             return _WHISPER_MODELS[key]
+        if device == "apple":
+            _ensure_mlx_whisper_model(cfg.model)
+            import mlx_whisper
+
+            _WHISPER_MODELS[key] = mlx_whisper
+            return mlx_whisper
+
+        from faster_whisper import WhisperModel
+
         local_path = _local_whisper_path(cfg.model)
         model_ref = str(local_path) if local_path else cfg.model
         kwargs = {"device":device,"compute_type":compute}
@@ -117,7 +231,8 @@ def get_local_whisper(cfg: ProviderConfig):
 def prepare_local_whisper(cfg: ProviderConfig) -> dict:
     model = get_local_whisper(cfg)
     device, compute = _whisper_device(cfg)
-    return {"ok":True,"model":cfg.model,"detail":f"Local Whisper '{cfg.model}' ready","runtime":type(model).__name__,"device":device,"compute_type":compute}
+    runtime = "MLX Whisper" if device == "apple" else type(model).__name__
+    return {"ok":True,"model":cfg.model,"detail":f"Local Whisper '{cfg.model}' ready","runtime":runtime,"device":device,"compute_type":compute}
 
 def _wav_to_float32(wav_bytes: bytes):
     import numpy as np, wave
@@ -136,14 +251,38 @@ def _wav_to_float32(wav_bytes: bytes):
 def _local_whisper_transcribe(wav_bytes: bytes, cfg: ProviderConfig, language: str, prompt: str) -> tuple[str,str|None]:
     model = get_local_whisper(cfg)
     audio = _wav_to_float32(wav_bytes)
-    kwargs = {"beam_size":1,"best_of":1,"temperature":0.0,"condition_on_previous_text":False,"vad_filter":False}
+    device, compute = _whisper_device(cfg)
     code = lang_code(language)
+    if device == "apple":
+        with _WHISPER_INFER_LOCK:
+            _activate_mlx_gpu(compute)
+            result = model.transcribe(
+                audio,
+                path_or_hf_repo=_mlx_model_reference(cfg.model),
+                language=None if code == "auto" else code,
+                initial_prompt=prompt[:500] or None,
+                temperature=0.0,
+                condition_on_previous_text=False,
+                fp16=compute != "float32",
+            )
+        return clean_asr_text(result.get("text", "")), result.get("language")
+
+    kwargs = {"beam_size":1,"best_of":1,"temperature":0.0,"condition_on_previous_text":False,"vad_filter":False}
     if code != "auto": kwargs["language"] = code
     if prompt: kwargs["hotwords"] = prompt[:500]
     with _WHISPER_INFER_LOCK:
         segments, info = model.transcribe(audio, **kwargs)
         text = " ".join(seg.text.strip() for seg in segments if seg.text.strip()).strip()
     return clean_asr_text(text), getattr(info,"language",None)
+
+
+def test_local_whisper_inference(cfg: ProviderConfig) -> dict:
+    from .audio import pcm16_to_wav_bytes
+
+    device, compute = _whisper_device(cfg)
+    silence = pcm16_to_wav_bytes(b"\x00\x00" * 16000, 16000)
+    _local_whisper_transcribe(silence, cfg, "en", "")
+    return {"device": device, "compute_type": compute}
 
 def _active_glossary(academic: AcademicConfig) -> str:
     profile = academic.glossary_profiles.get(academic.active_glossary_profile,"").strip()
@@ -205,13 +344,10 @@ async def test_provider(cfg: ProviderConfig, academic: AcademicConfig|None=None)
     academic = academic or AcademicConfig()
     if cfg.mode == "local_whisper":
         try:
-            import numpy as np
             model = get_local_whisper(cfg)
-            with _WHISPER_INFER_LOCK:
-                segments, _ = model.transcribe(np.zeros(16000,dtype=np.float32),beam_size=1,best_of=1,temperature=0.0,condition_on_previous_text=False,vad_filter=False)
-                list(segments)
-            device, compute = _whisper_device(cfg)
-            return {"ok":True,"model":cfg.model,"detail":f"Local Whisper inference ready on {device}/{compute}","runtime":type(model).__name__}
+            result = test_local_whisper_inference(cfg)
+            runtime = "MLX Whisper" if result["device"] == "apple" else type(model).__name__
+            return {"ok":True,"model":cfg.model,"detail":f"Local Whisper inference ready on {result['device']}/{result['compute_type']}","runtime":runtime}
         except Exception as exc:
             return {"ok":False,"model":cfg.model,"error":str(exc)}
     if cfg.mode == "bing_web":

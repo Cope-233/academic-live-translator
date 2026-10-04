@@ -32,10 +32,10 @@ const I18N = {
     academicNotes:'学术笔记', notePlaceholder:'研究想法、追问、待办…', note:'📝 笔记', important:'⭐ 重点', question:'❓ 问题', idea:'💡 想法', reference:'📚 文献', followUp:'⚠ 待跟进', saveNote:'保存笔记',
     mediaTranscription:'媒体转录', mediaDesc:'音频 / 视频 → ASR → 翻译 → 带时间戳会话。', sessionTitlePlaceholder:'会话标题', processMedia:'处理媒体', searchPlaceholder:'搜索转录、翻译或笔记', refresh:'刷新',
     interface:'界面', language:'语言', languageHint:'界面语言会立即切换并自动保存。', type:'类型', name:'名称',
-    asrHint:'默认使用轻量 Local Faster-Whisper。远程服务统一使用 OpenAI Chat Completions。', testAsr:'测试 ASR', translationHint:'Bing Free 无需密钥但属于实验性方案；稳定部署可使用 Microsoft Translator 或 OpenAI-compatible 服务。', testTranslation:'测试翻译',
+    asrHint:'本地 Whisper 会自动选择当前平台可用的加速方式，也可以手动指定 CPU。远程服务统一使用 OpenAI Chat Completions。', deviceCpu:'CPU', deviceCuda:'CUDA', deviceApple:'Apple silicon GPU（MLX / Metal）', testAsr:'测试 ASR', translationHint:'Bing Free 无需密钥但属于实验性方案；稳定部署可使用 Microsoft Translator 或 OpenAI-compatible 服务。', testTranslation:'测试翻译',
     academicCapture:'学术与采集', translationMode:'翻译模式', lowestLatency:'最低延迟', balanced:'平衡', highestContext:'最高上下文', saveAudio:'保存音频', yes:'是', no:'否', customGlossary:'自定义术语表', saveSettings:'保存设置',
     floatingWindow:'悬浮窗', openFloatingWindow:'打开悬浮窗', closeFloatingWindow:'关闭悬浮窗', floatingWindowDesc:'将实时原文与翻译放入可缩放的置顶悬浮窗，适合 Zoom、WebEx 和网页课程。', floatingWidth:'默认宽度', floatingHeight:'默认高度', floatingFontSize:'字幕字号', floatingWindowHint:'实验性功能：需要支持 Document Picture-in-Picture 的桌面版 Chromium 浏览器（推荐 Chrome / Edge）。打开后可继续拖动窗口边缘调整大小。', floatingUnsupported:'当前浏览器不支持实验性悬浮窗。请使用较新的桌面版 Chrome 或 Edge。', backToWebUI:'返回 WebUI', experimental:'实验性',
-    noSession:'尚未创建会话', saved:'已保存', settingsSaved:'设置已保存', ready:'可用', failed:'失败', noAudioDevice:'没有可用的 Windows 音频设备', websocketTimeout:'WebSocket 连接超时', screenshotSaved:'截图已保存', chooseFile:'请选择文件', processing:'处理中…', done:'完成', startupError:'启动错误',
+    noSession:'尚未创建会话', saved:'已保存', settingsSaved:'设置已保存', ready:'可用', failed:'失败', noAudioDevice:'没有可用的音频设备', websocketTimeout:'WebSocket 连接超时', screenshotSaved:'截图已保存', chooseFile:'请选择文件', processing:'处理中…', done:'完成', startupError:'启动错误',
     open:'打开', delete:'删除', deleteConfirm:'删除此会话及其录音和截图？', noSessions:'暂无会话。', segments:'段', notes:'条笔记'
   },
   en: {
@@ -48,10 +48,10 @@ const I18N = {
     academicNotes:'Academic Notes', notePlaceholder:'Research ideas, questions, follow-ups…', note:'📝 Note', important:'⭐ Important', question:'❓ Question', idea:'💡 Idea', reference:'📚 Reference', followUp:'⚠ Follow up', saveNote:'Save note',
     mediaTranscription:'Media transcription', mediaDesc:'Audio / video → ASR → translation → timestamped session.', sessionTitlePlaceholder:'Session title', processMedia:'Process media', searchPlaceholder:'Search transcript, translation or notes', refresh:'Refresh',
     interface:'Interface', language:'Language', languageHint:'The interface language changes immediately and is saved automatically.', type:'Type', name:'Name',
-    asrHint:'Default: lightweight Local Faster-Whisper. Remote ASR uses OpenAI Chat Completions.', testAsr:'Test ASR', translationHint:'Bing Free is zero-key but experimental. Use Microsoft Translator or an OpenAI-compatible service for reliable deployments.', testTranslation:'Test translation',
+    asrHint:'Local Whisper selects the available accelerator automatically. You can also choose CPU explicitly. Remote ASR uses OpenAI Chat Completions.', deviceCpu:'CPU', deviceCuda:'CUDA', deviceApple:'Apple silicon GPU (MLX / Metal)', testAsr:'Test ASR', translationHint:'Bing Free is zero-key but experimental. Use Microsoft Translator or an OpenAI-compatible service for reliable deployments.', testTranslation:'Test translation',
     academicCapture:'Academic & capture', translationMode:'Translation mode', lowestLatency:'Lowest latency', balanced:'Balanced', highestContext:'Highest context', saveAudio:'Save audio', yes:'Yes', no:'No', customGlossary:'Custom glossary', saveSettings:'Save settings',
     floatingWindow:'Floating window', openFloatingWindow:'Open floating window', closeFloatingWindow:'Close floating window', floatingWindowDesc:'Show live original text and translation in a resizable always-on-top window for Zoom, WebEx, and browser classes.', floatingWidth:'Default width', floatingHeight:'Default height', floatingFontSize:'Subtitle font size', floatingWindowHint:'Experimental: requires a desktop Chromium browser with Document Picture-in-Picture support (Chrome / Edge recommended). You can resize the floating window by dragging its edges.', floatingUnsupported:'This browser does not support the experimental floating window. Please use a recent desktop Chrome or Edge.', backToWebUI:'Back to WebUI', experimental:'Experimental',
-    noSession:'No session yet', saved:'Saved', settingsSaved:'Settings saved', ready:'Ready', failed:'Failed', noAudioDevice:'No Windows audio device available', websocketTimeout:'WebSocket timeout', screenshotSaved:'Screenshot saved', chooseFile:'Choose a file', processing:'Processing…', done:'Done', startupError:'Startup error',
+    noSession:'No session yet', saved:'Saved', settingsSaved:'Settings saved', ready:'Ready', failed:'Failed', noAudioDevice:'No audio device available', websocketTimeout:'WebSocket timeout', screenshotSaved:'Screenshot saved', chooseFile:'Choose a file', processing:'Processing…', done:'Done', startupError:'Startup error',
     open:'Open', delete:'Delete', deleteConfirm:'Delete this session, its recordings and screenshots?', noSessions:'No sessions yet.', segments:'segments', notes:'notes'
   }
 };
@@ -108,10 +108,33 @@ function providerUI(){
   $('mtAzure').style.display=$('mtMode').value==='azure_translator'?'block':'none';
 }
 
+function configureAsrDevices(devices, selected){
+  const labels={auto:tr('auto'),cpu:tr('deviceCpu'),cuda:tr('deviceCuda'),apple:tr('deviceApple')};
+  const select=$('asrDevice');
+  select.replaceChildren(...devices.map(value=>{
+    const option=document.createElement('option');
+    option.value=value;
+    option.textContent=labels[value]||value;
+    return option;
+  }));
+  select.value=devices.includes(selected)?selected:'auto';
+}
+
+function configureAudioSources(sources, selected){
+  const select=$('audioSource');
+  for(const option of select.options){
+    const available=sources.includes(option.value);
+    option.hidden=!available;
+    option.disabled=!available;
+  }
+  select.value=sources.includes(selected)?selected:'microphone';
+}
+
 const TARGET_LANGUAGES = new Set(['Chinese','English','Japanese','Korean','French','German','Spanish','Arabic']);
 
 async function loadConfig(){
-  state.config=await api('/api/config');
+  const [config,capabilities]=await Promise.all([api('/api/config'),api('/api/system/capabilities')]);
+  state.config=config;
   const c=state.config;
   state.language=c.interface?.language||'zh-CN';
   applyLanguage(state.language);
@@ -121,7 +144,7 @@ async function loadConfig(){
   $('asrName').value=c.asr.name;
   $('asrModel').value=['tiny','base','small','medium','large-v3-turbo'].includes(c.asr.model)?c.asr.model:'base';
   $('asrModelRemote').value=c.asr.model;
-  $('asrDevice').value=c.asr.device||'auto';
+  configureAsrDevices(capabilities.whisper_devices||['auto','cpu'],c.asr.device||'auto');
   $('asrCompute').value=c.asr.compute_type||'auto';
   $('asrBaseUrl').value=c.asr.base_url||'';
   $('asrApiKey').value=c.asr.api_key||'';
@@ -143,7 +166,7 @@ async function loadConfig(){
   $('maxSegmentMs').value=c.live.max_segment_ms;
   $('saveAudio').value=String(c.capture.save_audio);
   $('audioFormat').value=c.capture.audio_format;
-  $('audioSource').value=c.capture.input_source;
+  configureAudioSources(capabilities.audio_sources||['microphone','browser_system','browser_mix'],c.capture.input_source);
   $('liveSourceLanguage').value=c.academic.source_language;
   $('liveTargetLanguage').value=target;
   $('uiLanguage').value=state.language;

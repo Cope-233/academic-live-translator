@@ -4,7 +4,7 @@ from __future__ import annotations
 from .config import DATA_DIR, load_config
 from .providers import prepare_local_whisper
 
-MARKER = DATA_DIR / ".defaults-prepared-beta-0.1"
+MARKER = DATA_DIR / ".defaults-prepared-beta-0.6"
 
 def main() -> None:
     cfg = load_config()
@@ -14,7 +14,7 @@ def main() -> None:
     if MARKER.exists() and MARKER.read_text(encoding="utf-8").strip() == cfg.asr.model:
         print("[setup] Default local model already prepared.")
         return
-    print(f"[setup] First run: downloading/preparing Faster-Whisper model '{cfg.asr.model}'.")
+    print(f"[setup] First run: downloading/preparing local Whisper model '{cfg.asr.model}'.")
     print("[setup] This happens once; subsequent starts use the local cache.")
     prepare_local_whisper(cfg.asr)
     MARKER.write_text(cfg.asr.model, encoding="utf-8")

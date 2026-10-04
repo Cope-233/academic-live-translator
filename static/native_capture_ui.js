@@ -122,12 +122,12 @@
   };
 
   const originalToggleFloatingWindow = toggleFloatingWindow;
-  const toggleFloatingWindowBeta05 = async () => {
+  const toggleFloatingWindow = async () => {
     await originalToggleFloatingWindow();
     if (floatingWindowIsOpen()) {
-      state.floatingWindow.document.title = 'Academic Live Translator beta 0.5';
+      state.floatingWindow.document.title = 'Academic Live Translator beta 0.6';
     }
   };
-  $('floatingWindowBtn').onclick = toggleFloatingWindowBeta05;
+  $('floatingWindowBtn').onclick = toggleFloatingWindow;
   $('floatingWindowSettingsBtn').onclick = toggleFloatingWindowBeta05;
 })();

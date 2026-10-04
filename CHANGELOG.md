@@ -1,5 +1,17 @@
 # Changelog
 
+## beta 0.6 — 2026-10-04
+
+Apple silicon and cross-platform installation beta.
+
+- Added MLX Whisper inference through Apple MLX / Metal on M-series Macs.
+- Added automatic, CPU, and Apple silicon GPU device modes on supported Macs; Windows retains automatic, CPU, and CUDA modes.
+- Automatic mode selects MLX on Apple silicon, CUDA when the Windows NVIDIA runtime is available, and CPU as the fallback.
+- Installers detect the platform and architecture, install the matching dependencies, prepare the selected model, and run real inference checks before marking setup complete.
+- Added project-local MLX model storage on macOS; other model sizes download on first selection to avoid preloading every model.
+- Preserved beta 0.5 portable CUDA setup, model installation, and capture reliability fixes.
+- Updated Chinese and English installation guides, startup scripts, app version, and release metadata.
+
 ## beta 0.5 — 2026-10-04
 
 Whisper/Bing live-path and Windows microphone/configuration reliability beta.

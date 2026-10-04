@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import platform
 import sys
 import uuid
 from pathlib import Path
@@ -18,7 +19,7 @@ from .config import DATA_DIR, load_config, save_config, session_assets_dir
 from .exporters import export_json, export_markdown, export_srt, export_txt
 from .models import Annotation, AnnotationRequest, AppConfig, BookmarkRequest, ScreenshotAsset, ScreenshotRequest, Segment, SessionCreateRequest, SessionPatchRequest, TranslateRequest
 from .native_capture import NativeAudioCapture, list_native_devices
-from .providers import academic_hotwords, close_http_client, prepare_local_whisper, test_provider, transcribe_wav, translate_text
+from .providers import academic_hotwords, close_http_client, prepare_local_whisper, supported_whisper_devices, test_provider, transcribe_wav, translate_text
 from .recording import SessionAudioRecorder
 from .store import add_annotation, add_audio_file, add_screenshot, append_segment, create_session, delete_session, get_session, list_sessions, now_iso, patch_title, set_bookmark, update_segment
 
@@ -43,6 +44,22 @@ async def presentation_page(): return FileResponse(STATIC_DIR / "presentation.ht
 
 @app.get("/api/health")
 async def health(): return {"ok": True, "app": "Academic Live Translator", "version": __version__}
+
+@app.get("/api/system/capabilities")
+async def system_capabilities():
+    return {
+        "platform": sys.platform,
+        "machine": platform.machine(),
+        "whisper_devices": supported_whisper_devices(),
+        "audio_sources": supported_audio_sources(),
+    }
+
+
+def supported_audio_sources() -> list[str]:
+    audio_sources = ["microphone", "browser_system", "browser_mix"]
+    if sys.platform == "win32":
+        audio_sources.extend(["native_system", "native_microphone"])
+    return audio_sources
 
 @app.get("/api/config")
 async def get_config(): return load_config().model_dump()

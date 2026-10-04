@@ -2,7 +2,7 @@
 
 **简体中文** | [English](./README.en.md)
 
-** WebUI · Portable安装模式**
+**beta 0.6 · WebUI · Portable 安装模式**
 
 Academic Live Translator 是一个本地优先的实时语音转录、翻译与学术记录 WebUI，适用于课堂、研讨会、学术会议、日常会议、访谈以及已有音视频材料。
 
@@ -22,7 +22,7 @@ install.bat
 start_webui.bat
 ```
 
-如果 beta 0.5 尚未完成初始化，`start_webui.bat` 会自动执行完整安装，然后启动 WebUI。
+如果 beta 0.6 尚未完成初始化，`start_webui.bat` 会自动执行完整安装，然后启动 WebUI。
 
 安装脚本会自动：
 
@@ -38,6 +38,25 @@ start_webui.bat
 > 完整安装包含五个 Whisper 模型以及可选 CUDA Runtime，需要数 GB 磁盘空间和下载流量。五个模型本身约 4 GB，完整项目建议预留至少 6 GB 可用空间。
 
 Windows CUDA Runtime 使用 Faster-Whisper 官方文档所推荐的 Windows 本地库方案，来源为 [Purfview/whisper-standalone-win 的 cuBLAS/cuDNN bundle](https://github.com/Purfview/whisper-standalone-win/releases/tag/libs)。
+
+## macOS 安装（Apple silicon）
+
+在 M1、M2、M3 或 M4 Mac 上打开终端，进入项目目录后运行：
+
+```bash
+chmod +x start_webui.sh
+./start_webui.sh
+```
+
+启动脚本会检测 Apple 芯片和 Python 架构，在项目目录创建 `.venv/`，并自动安装适配 arm64 的 MLX Whisper。首次启动会准备当前配置的默认模型（默认 `base`），并分别执行 Apple GPU / Metal 与 CPU 推理自检。首次下载后，模型保存在项目目录中。MLX 使用 [Apple 的 MLX Whisper 实现](https://github.com/ml-explore/mlx-examples/tree/main/whisper) 和 [MLX Community 转换的模型](https://huggingface.co/mlx-community/whisper-base-mlx)。
+
+在 `设置 → ASR Provider → 设备` 中可以选择：
+
+- **自动**：M 系列 Mac 使用 MLX / Metal；Windows 检测到 NVIDIA GPU 时使用 CUDA；其他情况使用 CPU。
+- **CPU**：使用 Faster-Whisper / CTranslate2。
+- **Apple silicon GPU（MLX / Metal）**：仅在 M 系列 Mac 上显示。
+
+切换到其他 Whisper 型号时会自动下载对应平台的模型。Intel Mac 和 Linux 只显示自动与 CPU 选项。若 M 系列 Mac 提示 Python 架构不匹配，请安装 arm64 版本的 Python，删除项目内 `.venv/` 后重新运行启动脚本。
 
 ## 启动
 
@@ -78,6 +97,8 @@ academic-live-translator/
 │     ├─ small/
 │     ├─ medium/
 │     └─ large-v3-turbo/
+│  └─ mlx-whisper/           # Apple silicon 上使用的 MLX 模型
+│     └─ base/
 ├─ runtime/
 │  └─ cuda12/
 │     └─ bin/                 # Windows NVIDIA 用户的本地 CUDA/cuDNN DLL
@@ -100,7 +121,7 @@ academic-live-translator/
 ## 主要功能
 
 - 实时双语转录工作区
-- Local Faster-Whisper：tiny / base / small / medium / large-v3-turbo
+- 本地 Whisper：tiny / base / small / medium / large-v3-turbo（Apple silicon 使用 MLX；其他平台使用 Faster-Whisper）
 - Bing Free、Microsoft Translator 与 OpenAI-compatible 翻译
 - llama.cpp、vLLM、LM Studio、LocalAI 等 OpenAI-compatible 服务
 - 浏览器麦克风、标签页/屏幕音频、系统音频 + 麦克风混合
@@ -116,11 +137,11 @@ academic-live-translator/
 
 ## 默认 Provider
 
-### ASR：Local Faster-Whisper
+### ASR：本地 Whisper
 
-默认模型为 `base`。beta 0.5 完整安装会提前准备全部五个模型，之后切换模型无需重新下载。
+默认模型为 `base`。Windows 完整安装会提前准备全部五个 Faster-Whisper 模型。macOS Apple silicon 会为当前选中型号准备 MLX 和 CPU 模型；其他型号在首次选择时下载到项目目录。
 
-CPU 模式不需要 CUDA。Windows NVIDIA 用户通过一键安装获得项目目录内的 CUDA Runtime，推荐使用启动脚本运行，以便把 `runtime/cuda12/bin` 只加入当前应用进程的 DLL 搜索路径。
+自动模式在 Apple silicon 上使用 MLX / Metal，在 Windows NVIDIA 设备上使用 CUDA，否则使用 CPU。CPU 模式不需要 CUDA。Windows NVIDIA 用户通过一键安装获得项目目录内的 CUDA Runtime，推荐使用启动脚本运行，以便把 `runtime/cuda12/bin` 只加入当前应用进程的 DLL 搜索路径。
 
 ### 翻译：Bing Free（实验性）
 
@@ -150,7 +171,7 @@ Model: <translation model id>
 
 > 悬浮窗只是显示层，请保持主 WebUI 标签页打开。
 
-## Linux / macOS
+## Linux / Intel Mac
 
 仍可使用：
 
@@ -159,13 +180,13 @@ chmod +x start_webui.sh
 ./start_webui.sh
 ```
 
-Linux/macOS 支持浏览器麦克风、标签页/屏幕音频以及媒体文件工作流；Windows WASAPI 捕获和 Windows CUDA bundle 不适用。GPU Runtime 需要按对应平台自行准备。
+Linux 与 Intel Mac 使用 CPU Whisper。支持浏览器麦克风、标签页/屏幕音频以及媒体文件工作流；Windows WASAPI 捕获、Windows CUDA bundle 和 Apple MLX 加速不适用。
 
 ## 从旧版升级
 
-beta 0.5 继续使用 Portable-by-default 存储。已有 `data/config.json` 与 Session 可以继续使用。
+beta 0.6 继续使用 Portable-by-default 存储。已有 `data/config.json` 与 Session 可以继续使用。Windows 的 `cuda` 配置会在 Apple silicon 上自动映射到 MLX / Metal。
 
-首次运行 beta 0.5 时，启动脚本会检测 `data/.installed-beta-0.5`；如果不存在，会执行完整安装流程。旧版已经下载的 Hugging Face 模型缓存不会删除；五种模型与 CUDA runtime 保存在项目目录中。
+首次运行 beta 0.6 时，启动脚本会检测 `data/.installed-beta-0.6`；如果不存在，会执行对应平台的安装与推理自检。已有模型、配置、Session 和缓存不会删除。
 
 ## 开发
 

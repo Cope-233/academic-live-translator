@@ -7,5 +7,6 @@ numpy>=2.0,<3
 mss==10.2.0
 faster-whisper==1.2.1
 mintrans==1.1.0
-py7zr>=0.22,<1
+py7zr>=0.22,<1; sys_platform == "win32"
 PyAudioWPatch==0.2.12.8; sys_platform == "win32"
+mlx-whisper>=0.4.3,<1; sys_platform == "darwin" and platform_machine == "arm64"
