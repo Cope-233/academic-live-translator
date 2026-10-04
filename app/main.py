@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import sys
 import uuid
 from pathlib import Path
@@ -19,7 +20,9 @@ from .models import Annotation, AnnotationRequest, AppConfig, BookmarkRequest, S
 from .native_capture import NativeAudioCapture, list_native_devices
 from .providers import academic_hotwords, close_http_client, prepare_local_whisper, test_provider, transcribe_wav, translate_text
 from .recording import SessionAudioRecorder
-from .store import add_annotation, add_audio_file, add_screenshot, append_segment, create_session, delete_session, get_session, list_sessions, now_iso, patch_title, set_bookmark
+from .store import add_annotation, add_audio_file, add_screenshot, append_segment, create_session, delete_session, get_session, list_sessions, now_iso, patch_title, set_bookmark, update_segment
+
+logger = logging.getLogger("academic_live_translator")
 
 
 def runtime_root() -> Path:
@@ -161,15 +164,30 @@ async def _process_live_segment(websocket: WebSocket, send_lock: asyncio.Lock, s
     cfg=load_config()
     try:
         source,detected=await transcribe_wav(result.wav_bytes,cfg.asr,language=cfg.academic.source_language,prompt=academic_hotwords(cfg.academic))
-        if not source: return
-        async with send_lock: await websocket.send_json({"type":"transcript","sequence":sequence,"start_ms":result.start_ms,"end_ms":result.end_ms,"source":source,"language":detected})
-        translation=await translate_text(source,cfg.translation,cfg.academic,context=_translation_context(session_id,cfg))
-        segment=Segment(id=uuid.uuid4().hex[:10],start_ms=result.start_ms,end_ms=result.end_ms,source=source,translation=translation,language=detected)
-        append_segment(session_id,segment)
-        async with send_lock: await websocket.send_json({"type":"segment","sequence":sequence,"segment":segment.model_dump()})
     except Exception as exc:
+        logger.exception("ASR failed for live segment %s", sequence)
         async with send_lock:
-            try: await websocket.send_json({"type":"error","sequence":sequence,"message":str(exc)})
+            try: await websocket.send_json({"type":"error","stage":"asr","sequence":sequence,"message":f"ASR: {exc}"})
+            except Exception: pass
+        return
+    if not source:
+        return
+
+    segment=Segment(id=uuid.uuid4().hex[:10],start_ms=result.start_ms,end_ms=result.end_ms,source=source,translation="",language=detected)
+    append_segment(session_id,segment)
+    async with send_lock:
+        await websocket.send_json({"type":"segment","phase":"asr","sequence":sequence,"segment":segment.model_dump()})
+
+    try:
+        translation=await translate_text(source,cfg.translation,cfg.academic,context=_translation_context(session_id,cfg))
+        segment.translation=translation
+        update_segment(session_id,segment)
+        async with send_lock:
+            await websocket.send_json({"type":"segment_update","phase":"translation","sequence":sequence,"segment":segment.model_dump()})
+    except Exception as exc:
+        logger.exception("Translation failed for live segment %s", sequence)
+        async with send_lock:
+            try: await websocket.send_json({"type":"error","stage":"translation","sequence":sequence,"message":f"Translation: {exc}"})
             except Exception: pass
 
 def _new_detector_for_session(session_id: str) -> SpeechEndpointDetector:
