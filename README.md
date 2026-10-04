@@ -1,6 +1,7 @@
 # Academic Live Translator
 
 [简体中文](./README.md) | [English](./README.en.md)
+<img width="1920" height="1010" alt="image" src="https://github.com/user-attachments/assets/47ccf499-a5b4-44e3-b808-d8451943af51" />
 
 **beta01 · WebUI · 默认便携模式**
 
