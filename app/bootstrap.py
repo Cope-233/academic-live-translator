@@ -4,7 +4,7 @@ from __future__ import annotations
 from .config import DATA_DIR, load_config
 from .providers import prepare_local_whisper
 
-MARKER = DATA_DIR / ".defaults-prepared-beta01"
+MARKER = DATA_DIR / ".defaults-prepared-beta-0.1"
 
 def main() -> None:
     cfg = load_config()
