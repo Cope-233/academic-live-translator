@@ -1,0 +1,98 @@
+name: sync beta release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read beta version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(python - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path('app/__init__.py').read_text(encoding='utf-8')
+          m = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', text)
+          if not m:
+              raise SystemExit('Version not found')
+          print(m.group(1))
+          PY
+          )
+          if [[ "$VERSION" != beta* ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          TAG=$(echo "$VERSION" | tr ' ' '-')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes from CHANGELOG
+        if: steps.version.outputs.skip == 'false'
+        shell: bash
+        run: |
+          VERSION='${{ steps.version.outputs.version }}'
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          version = os.environ['VERSION']
+          lines = Path('CHANGELOG.md').read_text(encoding='utf-8').splitlines()
+          out = []
+          active = False
+          for line in lines:
+              if line.startswith('## '):
+                  if active:
+                      break
+                  if line.startswith(f'## {version}'):
+                      active = True
+                      continue
+              if active:
+                  out.append(line)
+          notes = '\n'.join(out).strip()
+          if not notes:
+              notes = f'{version} beta release.'
+          Path('release-notes.md').write_text(notes + '\n', encoding='utf-8')
+          PY
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Move beta tag to current main
+        if: steps.version.outputs.skip == 'false'
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -f '${{ steps.version.outputs.tag }}' "$GITHUB_SHA"
+          git push origin -f 'refs/tags/${{ steps.version.outputs.tag }}'
+
+      - name: Create or update GitHub Release
+        if: steps.version.outputs.skip == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --title "$VERSION" \
+              --notes-file release-notes.md \
+              --prerelease
+          else
+            gh release create "$TAG" \
+              --title "$VERSION" \
+              --notes-file release-notes.md \
+              --prerelease \
+              --target "$GITHUB_SHA"
+          fi
