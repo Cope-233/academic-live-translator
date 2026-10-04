@@ -2,7 +2,6 @@
 
 [简体中文](./README.md) | [English](./README.en.md)
 
-
 **beta01 · WebUI · 默认便携模式**
 
 Academic Live Translator 是一个本地优先的 WebUI，用于实时语音转录、翻译与学术场景记录。它面向课堂、研讨会、学术会议、日常会议、访谈以及已有音视频材料等使用场景。
@@ -12,6 +11,7 @@ Academic Live Translator 是一个本地优先的 WebUI，用于实时语音转�
 ## 主要功能
 
 - 实时双语转录工作区
+- WebUI 默认中文，可在 Settings 中切换中文 / English
 - 支持浏览器麦克风、浏览器标签页/屏幕音频、Windows WASAPI 系统音频回环以及音视频文件输入
 - 学术术语表 Profile 与自定义术语
 - Important / Question / Idea / Reference / Follow-up / Note 等学术标记
@@ -97,13 +97,13 @@ Linux/macOS 暂不支持 Windows 原生 WASAPI 系统音频捕获，但浏览器
 
 ## OpenAI-compatible Provider
 
-ASR 与翻译都可以使用兼容 OpenAI API 的服务。例如，当 llama.cpp Router 同时托管多个模型时，ASR 和翻译可以共用同一个 Base URL：
+ASR 与翻译都可以使用兼容 OpenAI Chat Completions 的服务。例如，当 llama.cpp Router 同时托管多个模型时，ASR 和翻译可以共用同一个 Base URL：
 
 ```text
 ASR
 Base URL: http://127.0.0.1:8080/v1
 Model: <ASR model id>
-Mode: OpenAI /audio/transcriptions 或 Chat + input_audio
+Mode: OpenAI Chat Completions
 
 Translation
 Base URL: http://127.0.0.1:8080/v1
@@ -111,7 +111,7 @@ Model: <translation model id>
 Mode: OpenAI Chat Completions
 ```
 
-因此项目不需要单独提供 llama.cpp 专属模式。
+远程 ASR 通过 Chat Completions 的 `input_audio` 发送音频。因此所接入的 OpenAI-compatible 服务需要支持多模态音频输入。
 
 ## 实时音频输入
 
@@ -125,6 +125,12 @@ Mode: OpenAI Chat Completions
 - 音频 / 视频文件
 
 对于 Windows 上通过 Chrome、Zoom、Teams、VLC 等播放的在线课程，通常推荐使用 WASAPI loopback。它直接捕获系统数字音频流，即使使用耳机也无需让麦克风重新录制扬声器声音。
+
+## 语言
+
+WebUI 默认使用中文，可在 `Settings → 界面 → 语言` 中切换为 English，设置会自动保存。
+
+目标翻译语言目前提供中文、English、日本語、한국어、Français、Deutsch、Español 与 العربية。Malay 仍可作为源语言使用，但不再列为默认目标语言。
 
 ## 学术工作流
 
@@ -141,7 +147,7 @@ Mode: OpenAI Chat Completions
 
 `beta01` **不会自动复用** v0.1 / v0.2 / v0.3 曾经位于 AppData 中的数据目录。这样可以避免不同版本之间意外共享 Session，同时避免应用数据隐藏占用系统盘。
 
-如果需要保留旧 Session，请先备份旧数据，再将需要的 Session JSON 与对应 assets 手动复制到新的 portable `data/` 目录中。
+现有 beta01 中使用旧 ASR 模式名称的配置会自动迁移到统一的 `OpenAI Chat Completions` 模式；旧的 Malay 目标语言会回退为中文。
 
 ## 开发
 
@@ -151,6 +157,8 @@ python -m venv .venv
 # Linux/macOS: .venv/bin/python -m pip install -r requirements-dev.txt
 pytest
 ```
+
+CI 同时执行 Python 测试与 `node --check static/app.js`，用于拦截 WebUI JavaScript 语法错误。
 
 ## License
 
