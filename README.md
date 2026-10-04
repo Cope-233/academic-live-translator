@@ -2,65 +2,44 @@
 
 **简体中文** | [English](./README.en.md)
 
-**beta 0.6 · WebUI · Portable 安装模式**
-
 Academic Live Translator 是一个本地优先的实时语音转录、翻译与学术记录 WebUI，适用于课堂、研讨会、学术会议、日常会议、访谈以及已有音视频材料。
 
-> Beta 阶段统一使用 `beta x.y` 作为版本标识；首个稳定版本发布后再开始使用正式语义化版本号。
+## 项目介绍
 
-## Windows 一键安装
+项目将实时音频采集、ASR、翻译与学术记录整合到一个浏览器工作区中，并尽量将模型、配置、缓存和会话数据保存在项目目录内，方便迁移与管理。
 
-### 最简单：双击
+主要功能：
 
-```text
-install.bat
-```
+- 实时原文 / 译文双栏显示，支持同步滚动与自动跟随最新内容
+- 本地 Whisper ASR：`tiny`、`base`、`small`、`medium`、`large-v3-turbo`
+- Apple silicon 支持 MLX / Metal；Windows NVIDIA 支持 CUDA；其他环境可使用 CPU
+- 支持 Bing Free、Microsoft Translator 与 OpenAI-compatible 翻译服务
+- 支持 OpenAI-compatible ASR，可连接 llama.cpp、vLLM、LM Studio、LocalAI 等服务
+- 浏览器麦克风、标签页 / 屏幕音频、系统音频 + 麦克风混合
+- Windows WASAPI 系统音频回环与原生麦克风捕捉
+- 音频 / 视频文件转录与翻译
+- 实验性双语悬浮字幕窗，可覆盖 Zoom、WebEx、网页课程或演示文稿
+- 学术术语表、重点标记、笔记、截图与 Session Library
+- TXT、Markdown、SRT、JSON 导出
+- Portable-by-default：`.venv/`、`data/`、`models/`、`runtime/`、`cache/`、`logs/` 均保存在项目目录内
 
-或者直接双击：
+## 使用方法
+
+### Windows
+
+需要已安装 Python。下载或克隆项目后，直接双击：
 
 ```text
 start_webui.bat
 ```
 
-如果 beta 0.6 尚未完成初始化，`start_webui.bat` 会自动执行完整安装，然后启动 WebUI。
+首次启动会自动完成项目环境初始化，包括创建 `.venv/`、安装依赖、准备本地 Whisper 模型，并在检测到 NVIDIA GPU 时准备项目目录内的 CUDA Runtime。安装完成后会自动打开：
 
-安装脚本会自动：
-
-1. 在项目目录创建 `.venv/`；
-2. 安装 Python 依赖；
-3. 下载全部五种 Faster-Whisper 模型：`tiny`、`base`、`small`、`medium`、`large-v3-turbo`；
-4. 将模型保存在 `models/faster-whisper/<模型名>/`；
-5. Windows 检测到 NVIDIA GPU 时，下载项目专用的 CUDA 12 cuBLAS / cuDNN Runtime；
-6. 将 GPU Runtime 解压到 `runtime/cuda12/bin/`，不会修改系统级 CUDA 安装；
-7. 运行 Whisper CPU / int8 的真实推理自检；
-8. 如存在 NVIDIA Runtime，再运行 CUDA / float16 的真实推理自检。
-
-> 完整安装包含五个 Whisper 模型以及可选 CUDA Runtime，需要数 GB 磁盘空间和下载流量。五个模型本身约 4 GB，完整项目建议预留至少 6 GB 可用空间。
-
-Windows CUDA Runtime 使用 Faster-Whisper 官方文档所推荐的 Windows 本地库方案，来源为 [Purfview/whisper-standalone-win 的 cuBLAS/cuDNN bundle](https://github.com/Purfview/whisper-standalone-win/releases/tag/libs)。
-
-## macOS 安装（Apple silicon）
-
-在 M1、M2、M3 或 M4 Mac 上打开终端，进入项目目录后运行：
-
-```bash
-chmod +x start_webui.sh
-./start_webui.sh
+```text
+http://127.0.0.1:8765
 ```
 
-启动脚本会检测 Apple 芯片和 Python 架构，在项目目录创建 `.venv/`，并自动安装适配 arm64 的 MLX Whisper。首次启动会准备当前配置的默认模型（默认 `base`），并分别执行 Apple GPU / Metal 与 CPU 推理自检。首次下载后，模型保存在项目目录中。MLX 使用 [Apple 的 MLX Whisper 实现](https://github.com/ml-explore/mlx-examples/tree/main/whisper) 和 [MLX Community 转换的模型](https://huggingface.co/mlx-community/whisper-base-mlx)。
-
-在 `设置 → ASR Provider → 设备` 中可以选择：
-
-- **自动**：M 系列 Mac 使用 MLX / Metal；Windows 检测到 NVIDIA GPU 时使用 CUDA；其他情况使用 CPU。
-- **CPU**：使用 Faster-Whisper / CTranslate2。
-- **Apple silicon GPU（MLX / Metal）**：仅在 M 系列 Mac 上显示。
-
-切换到其他 Whisper 型号时会自动下载对应平台的模型。Intel Mac 和 Linux 只显示自动与 CPU 选项。若 M 系列 Mac 提示 Python 架构不匹配，请安装 arm64 版本的 Python，删除项目内 `.venv/` 后重新运行启动脚本。
-
-## 启动
-
-完成安装后，推荐双击：
+之后每次使用只需要再次运行：
 
 ```text
 start_webui.bat
@@ -73,132 +52,53 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\start_webui.ps1
 ```
 
-WebUI 默认地址：
+Windows 用户可在 **音频来源** 中选择 WASAPI 系统音频，用于直接捕捉 Zoom、WebEx、浏览器课程或其他桌面程序正在播放的声音。
 
-```text
-http://127.0.0.1:8765
-```
+### macOS（Apple silicon）
 
-## Portable 目录结构
+适用于 M 系列 Mac。建议使用原生 arm64 Python。
 
-应用自身产生或下载的运行数据默认集中在项目目录，不写入 AppData：
-
-```text
-academic-live-translator/
-├─ .venv/                     # 项目 Python 环境
-├─ data/
-│  ├─ config.json
-│  ├─ sessions/
-│  └─ assets/                 # 录音与截图
-├─ models/
-│  └─ faster-whisper/
-│     ├─ tiny/
-│     ├─ base/
-│     ├─ small/
-│     ├─ medium/
-│     └─ large-v3-turbo/
-│  └─ mlx-whisper/           # Apple silicon 上使用的 MLX 模型
-│     └─ base/
-├─ runtime/
-│  └─ cuda12/
-│     └─ bin/                 # Windows NVIDIA 用户的本地 CUDA/cuDNN DLL
-├─ cache/
-│  ├─ huggingface/
-│  ├─ pip/
-│  ├─ downloads/
-│  └─ temp/
-├─ logs/
-├─ app/
-├─ static/
-├─ install.bat
-├─ install.ps1
-├─ start_webui.bat
-└─ start_webui.ps1
-```
-
-`.venv/`、`data/`、`models/`、`runtime/`、`cache/` 与 `logs/` 都不会提交到 Git。
-
-## 主要功能
-
-- 实时双语转录工作区
-- 本地 Whisper：tiny / base / small / medium / large-v3-turbo（Apple silicon 使用 MLX；其他平台使用 Faster-Whisper）
-- Bing Free、Microsoft Translator 与 OpenAI-compatible 翻译
-- llama.cpp、vLLM、LM Studio、LocalAI 等 OpenAI-compatible 服务
-- 浏览器麦克风、标签页/屏幕音频、系统音频 + 麦克风混合
-- Windows WASAPI 系统回环与原生麦克风
-- 音频 / 视频文件转录
-- 原文 / 翻译双栏同步滚动与自动跟随
-- 实验性 Document Picture-in-Picture 置顶悬浮字幕窗
-- 学术术语表与自定义术语
-- Important / Question / Idea / Reference / Follow-up / Note 标记
-- 屏幕/PPT截图
-- Session Library 搜索与删除
-- TXT、Markdown、SRT、JSON 导出
-
-## 默认 Provider
-
-### ASR：本地 Whisper
-
-默认模型为 `base`。Windows 完整安装会提前准备全部五个 Faster-Whisper 模型。macOS Apple silicon 会为当前选中型号准备 MLX 和 CPU 模型；其他型号在首次选择时下载到项目目录。
-
-自动模式在 Apple silicon 上使用 MLX / Metal，在 Windows NVIDIA 设备上使用 CUDA，否则使用 CPU。CPU 模式不需要 CUDA。Windows NVIDIA 用户通过一键安装获得项目目录内的 CUDA Runtime，推荐使用启动脚本运行，以便把 `runtime/cuda12/bin` 只加入当前应用进程的 DLL 搜索路径。
-
-### 翻译：Bing Free（实验性）
-
-Bing Free 无需 API Key，适合首次使用与轻量场景。它依赖非官方 Web 接口，因此仍标记为 Experimental。需要长期稳定部署时，可使用 Microsoft Translator 或 OpenAI-compatible 翻译服务。
-
-## OpenAI-compatible Provider
-
-例如 llama.cpp Router：
-
-```text
-ASR
-Mode: OpenAI Chat Completions
-Base URL: http://127.0.0.1:8080/v1
-Model: <ASR model id>
-
-Translation
-Mode: OpenAI Chat Completions
-Base URL: http://127.0.0.1:8080/v1
-Model: <translation model id>
-```
-
-远程 ASR 通过 Chat Completions 的 `input_audio` 发送 WAV 音频，因此服务端需要支持对应的多模态音频输入格式。
-
-## 悬浮窗（Experimental）
-
-在较新的桌面 Chrome / Edge 中，可以通过 Document Picture-in-Picture 把原文与翻译放到 Zoom、WebEx、PPT 或网页课程上方。悬浮窗支持调整大小、自动跟随最新 Segment，并与主 WebUI 共用实时 Session。
-
-> 悬浮窗只是显示层，请保持主 WebUI 标签页打开。
-
-## Linux / Intel Mac
-
-仍可使用：
+进入项目目录后运行：
 
 ```bash
 chmod +x start_webui.sh
 ./start_webui.sh
 ```
 
-Linux 与 Intel Mac 使用 CPU Whisper。支持浏览器麦克风、标签页/屏幕音频以及媒体文件工作流；Windows WASAPI 捕获、Windows CUDA bundle 和 Apple MLX 加速不适用。
+首次启动会创建 `.venv/`、安装依赖并准备 Whisper 模型。默认自动模式会优先使用 MLX / Metal 加速；也可以在 **设置 → ASR Provider → 设备** 中切换为 CPU。
 
-## 从旧版升级
+WebUI 地址：
 
-beta 0.6 继续使用 Portable-by-default 存储。已有 `data/config.json` 与 Session 可以继续使用。Windows 的 `cuda` 配置会在 Apple silicon 上自动映射到 MLX / Metal。
-
-首次运行 beta 0.6 时，启动脚本会检测 `data/.installed-beta-0.6`；如果不存在，会执行对应平台的安装与推理自检。已有模型、配置、Session 和缓存不会删除。
-
-## 开发
-
-```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\python -m pip install -r requirements-dev.txt
-pytest
+```text
+http://127.0.0.1:8765
 ```
 
-CI 同时检查 Python 测试与 WebUI JavaScript 语法。
+如果提示 Python 架构不是 `arm64`，请安装原生 Apple silicon Python，删除项目中的 `.venv/` 后重新运行启动脚本。
 
-## License
+### Linux / Intel Mac
 
-本项目采用 MIT License，详见 [LICENSE](LICENSE)。
+进入项目目录后运行：
+
+```bash
+chmod +x start_webui.sh
+./start_webui.sh
+```
+
+Linux 与 Intel Mac 默认使用 CPU Whisper，可使用浏览器麦克风、标签页 / 屏幕音频以及媒体文件工作流。
+
+WebUI 地址：
+
+```text
+http://127.0.0.1:8765
+```
+
+### 启动后
+
+1. 在 **实时** 页面选择音频来源。
+2. 设置源语言与目标语言。
+3. 点击 **开始监听**。
+4. 原文与翻译会实时写入当前 Session。
+5. 需要更换 ASR 或翻译服务时，在 **设置** 中选择本地 Whisper、Microsoft Translator 或 OpenAI-compatible Provider。
+6. 单屏使用 Zoom、WebEx 或网页课程时，可启用标记为 **Experimental** 的悬浮窗，将原文与译文保持在其他窗口上方。
+
+本地会话、模型、缓存、录音和截图默认保存在当前项目目录中；迁移或删除程序时可直接管理整个项目文件夹。
