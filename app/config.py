@@ -52,6 +52,9 @@ def _migrate_config(raw: dict) -> dict:
         endpoint = asr.get("endpoint")
         if not endpoint or str(endpoint).rstrip("/").endswith("audio/transcriptions"):
             asr["endpoint"] = None
+    academic = raw.get("academic")
+    if isinstance(academic, dict) and academic.get("target_language") == "Malay":
+        academic["target_language"] = "Chinese"
     raw.setdefault("interface", {"language": "zh-CN"})
     return raw
 
