@@ -44,6 +44,18 @@ ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 CONFIG_PATH = DATA_DIR / "config.json"
 
 
+def _migrate_config(raw: dict) -> dict:
+    """Normalize older beta01 config values without breaking portable installs."""
+    asr = raw.get("asr")
+    if isinstance(asr, dict) and asr.get("mode") in {"openai_transcriptions", "openai_chat_audio"}:
+        asr["mode"] = "openai_chat"
+        endpoint = asr.get("endpoint")
+        if not endpoint or str(endpoint).rstrip("/").endswith("audio/transcriptions"):
+            asr["endpoint"] = None
+    raw.setdefault("interface", {"language": "zh-CN"})
+    return raw
+
+
 def load_config() -> AppConfig:
     if not CONFIG_PATH.exists():
         cfg = AppConfig()
@@ -51,7 +63,9 @@ def load_config() -> AppConfig:
         return cfg
     try:
         raw = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-        return AppConfig.model_validate(raw)
+        cfg = AppConfig.model_validate(_migrate_config(raw))
+        save_config(cfg)
+        return cfg
     except Exception:
         broken = CONFIG_PATH.with_suffix(".broken.json")
         try:
