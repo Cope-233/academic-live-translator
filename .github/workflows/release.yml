@@ -15,6 +15,21 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Validate WebUI JavaScript
+        run: node --check static/app.js
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run Python tests
+        run: python -m pytest -q
+
       - name: Read beta version
         id: version
         shell: bash

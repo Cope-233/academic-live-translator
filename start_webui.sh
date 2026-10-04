@@ -18,5 +18,5 @@ if [[ ! -x .venv/bin/python ]]; then
 fi
 .venv/bin/python -m pip install --disable-pip-version-check -r requirements.txt
 .venv/bin/python -m app.bootstrap
-echo "[start] Academic Live Translator beta 0.1 -> http://127.0.0.1:8765"
+echo "[start] Academic Live Translator beta 0.2 -> http://127.0.0.1:8765"
 .venv/bin/python run.py

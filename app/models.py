@@ -42,6 +42,9 @@ class CaptureConfig(BaseModel):
 
 class InterfaceConfig(BaseModel):
     language: Literal["zh-CN","en"] = "zh-CN"
+    floating_window_width: int = Field(default=960, ge=420, le=2400)
+    floating_window_height: int = Field(default=420, ge=220, le=1400)
+    floating_window_font_size: int = Field(default=18, ge=12, le=36)
 
 class AcademicConfig(BaseModel):
     source_language: str = "auto"

@@ -1,4 +1,10 @@
 {
+  "interface": {
+    "language": "zh-CN",
+    "floating_window_width": 960,
+    "floating_window_height": 420,
+    "floating_window_font_size": 18
+  },
   "asr": {
     "name": "Local Whisper",
     "mode": "local_whisper",

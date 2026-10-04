@@ -1,16 +1,45 @@
 # Academic Live Translator
 
-[简体中文](./README.md) | [English](./README.en.md)
+**简体中文** | [English](./README.en.md)
 
-**beta 0.1 · WebUI · 默认便携模式**
+**beta 0.2 · WebUI · 默认便携模式**
 
 Academic Live Translator 是一个本地优先的 WebUI，用于实时语音转录、翻译与学术场景记录。它面向课堂、研讨会、学术会议、日常会议、访谈以及已有音视频材料等使用场景。
 
-> 本项目目前处于 Beta 阶段。测试阶段使用 `beta x.y` 版本标识；首个稳定版本发布后再开始使用正式的语义化版本号。
+> 本项目目前处于 Beta 阶段。预发布版本统一使用 `beta x.y` 作为版本标识；首个稳定版本发布后再开始使用正式语义化版本号。
+
+## beta 0.2 新功能：悬浮窗（Experimental）
+
+beta 0.2 新增实验性的 **Floating Window / 悬浮窗**。在支持 Document Picture-in-Picture 的桌面 Chromium 浏览器中，可以把实时字幕从 WebUI 弹出为可缩放的置顶窗口，覆盖在 Zoom、WebEx、浏览器课程、PPT 或其他桌面应用上方。
+
+悬浮窗使用两栏布局：
+
+```text
+┌───────────────────────────────────────────────────────┐
+│ Academic Live Translator · Experimental       WebUI × │
+├──────────────────────────┬────────────────────────────┤
+│ 原文                     │ 翻译                       │
+│ 00:21                    │ 00:21                      │
+│ The structural equation │ 该结构方程模型……           │
+│ model...                 │                            │
+└──────────────────────────┴────────────────────────────┘
+```
+
+- 左栏显示 ASR 原文，右栏显示翻译；
+- 两栏按同一 Segment 对齐，共用一个滚动轴；
+- 新内容默认自动跟随到底部，手动上翻时暂停自动跟随；
+- 可在 `Settings → 悬浮窗` 中设置默认宽度、高度和字幕字号；
+- 窗口打开后可以直接拖动边缘调整尺寸，新的宽高会自动保存；
+- 悬浮窗中的 `返回 WebUI` 可以快速切回主界面；
+- 不需要重新安装桌面客户端，现有 WebUI 继续负责音频采集、ASR、翻译和 Session 管理。
+
+> **Experimental：** 该功能依赖浏览器的 Document Picture-in-Picture API。推荐使用较新的桌面版 Chrome 或 Edge。Firefox、Safari 或部分 Chromium 环境可能暂不支持；不支持时 WebUI 会给出提示，不影响普通 WebUI 功能。
 
 ## 主要功能
 
-- 实时双语转录工作区，原文与译文支持同步滚动并自动跟随最新记录
+- 实时双语转录工作区
+- **实验性置顶悬浮双语字幕窗口**
+- 原文 / 翻译双栏同步滚动与自动跟随最新内容
 - WebUI 默认中文，可在 Settings 中切换中文 / English
 - 支持浏览器麦克风、浏览器标签页/屏幕音频、Windows WASAPI 系统音频回环以及音视频文件输入
 - 学术术语表 Profile 与自定义术语
@@ -55,8 +84,9 @@ academic-live-translator/
 - Python 3.11–3.13
 - 如需原生 WASAPI 系统音频捕获，需要 Windows 10/11
 - 浏览器音频捕获推荐使用 Chrome / Edge
+- **悬浮窗实验功能推荐桌面版 Chrome / Edge，并要求浏览器支持 Document Picture-in-Picture**
 - 推荐安装 FFmpeg，用于媒体格式转换与 FLAC 录音
-- GPU 不是必需条件。默认的 Faster-Whisper `base` 模型可以直接使用 CPU 运行
+- GPU 不是必需条件。默认 Faster-Whisper `base` 模型可以直接使用 CPU 运行
 
 ## Windows 快速开始
 
@@ -81,7 +111,7 @@ chmod +x start_webui.sh
 ./start_webui.sh
 ```
 
-Linux/macOS 暂不支持 Windows 原生 WASAPI 系统音频捕获，但浏览器麦克风、标签页/屏幕音频捕获以及 Media 文件处理功能仍然可以使用。
+Linux/macOS 暂不支持 Windows 原生 WASAPI 系统音频捕获，但浏览器麦克风、标签页/屏幕音频捕获以及 Media 文件处理功能仍然可以使用。悬浮窗能力取决于所用浏览器是否实现 Document Picture-in-Picture。
 
 ## 默认 Provider
 
@@ -124,7 +154,20 @@ Mode: OpenAI Chat Completions
 - Windows 原生麦克风
 - 音频 / 视频文件
 
-对于 Windows 上通过 Chrome、Zoom、Teams、VLC 等播放的在线课程，通常推荐使用 WASAPI loopback。它直接捕获系统数字音频流，即使使用耳机也无需让麦克风重新录制扬声器声音。
+对于 Windows 上通过 Chrome、Zoom、Teams、WebEx、VLC 等播放的在线课程，通常推荐使用 WASAPI loopback。它直接捕获系统数字音频流，即使使用耳机也无需让麦克风重新录制扬声器声音。
+
+## 悬浮窗使用方法
+
+1. 在 `Live` 页面正常选择音频来源并开始监听；
+2. 点击 Session 标题右侧的 `悬浮窗 · Experimental`；
+3. Chrome / Edge 会创建一个独立置顶的小窗口；
+4. 把它拖到 Zoom、WebEx、课程网页或 PPT 上方；
+5. 根据需要调整大小；
+6. 点击悬浮窗中的 `返回 WebUI` 回到完整工作区，或点击 `×` 关闭悬浮窗。
+
+也可以先在 `Settings → 悬浮窗` 设置默认宽度、高度与字幕字号，再打开悬浮窗。
+
+悬浮窗只是实时显示层，**不要关闭原来的 Academic Live Translator WebUI 标签页**；音频采集与推理仍由主页面和本地 FastAPI 服务负责。
 
 ## 语言
 
@@ -136,8 +179,8 @@ WebUI 默认使用中文，可在 `Settings → 界面 → 语言` 中切换为 
 
 在实时 Session 中，你可以：
 
-- 同时查看原始转录与翻译，并同步滚动两侧记录；
-- 默认自动滚动至最新记录；手动向上查看历史内容时会暂时停止自动跟随，回到底部后自动恢复；
+- 同时查看原始转录与翻译；
+- 在 WebUI 或实验性悬浮窗中跟随实时双语字幕；
 - 使用学术术语 Profile 或自定义术语；
 - 将内容标记为 Important、Question、Idea、Reference、Follow-up 或 Note；
 - 截取当前屏幕并作为课程/PPT快照保存；
@@ -146,9 +189,9 @@ WebUI 默认使用中文，可在 `Settings → 界面 → 语言` 中切换为 
 
 ## 从旧版迁移
 
-`beta 0.1` **不会自动复用** v0.1 / v0.2 / v0.3 曾经位于 AppData 中的数据目录。这样可以避免不同版本之间意外共享 Session，同时避免应用数据隐藏占用系统盘。
+beta 0.2 继续使用 Portable-by-default 存储，不会自动复用早期 v0.1 / v0.2 / v0.3 位于 AppData 中的数据目录。
 
-旧 beta 配置中使用早期 ASR 模式名称的设置会自动迁移到统一的 `OpenAI Chat Completions` 模式；旧的 Malay 目标语言会回退为中文。
+现有 beta 0.1 配置可以直接读取；新增的悬浮窗宽度、高度和字号会自动使用默认值，无需手工迁移配置。
 
 ## 开发
 

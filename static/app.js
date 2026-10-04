@@ -13,7 +13,11 @@ const state = {
   devices: {supported:false, system:[], microphones:[]},
   language: 'zh-CN',
   autoFollow: true,
-  programmaticScroll: false
+  programmaticScroll: false,
+  floatingWindow: null,
+  floatingAutoFollow: true,
+  floatingProgrammatic: false,
+  floatingResizeTimer: null
 };
 
 const I18N = {
@@ -29,6 +33,7 @@ const I18N = {
     interface:'界面', language:'语言', languageHint:'界面语言会立即切换并自动保存。', type:'类型', name:'名称',
     asrHint:'默认使用轻量 Local Faster-Whisper。远程服务统一使用 OpenAI Chat Completions。', testAsr:'测试 ASR', translationHint:'Bing Free 无需密钥但属于实验性方案；稳定部署可使用 Microsoft Translator 或 OpenAI-compatible 服务。', testTranslation:'测试翻译',
     academicCapture:'学术与采集', translationMode:'翻译模式', lowestLatency:'最低延迟', balanced:'平衡', highestContext:'最高上下文', saveAudio:'保存音频', yes:'是', no:'否', customGlossary:'自定义术语表', saveSettings:'保存设置',
+    floatingWindow:'悬浮窗', openFloatingWindow:'打开悬浮窗', closeFloatingWindow:'关闭悬浮窗', floatingWindowDesc:'将实时原文与翻译放入可缩放的置顶悬浮窗，适合 Zoom、WebEx 和网页课程。', floatingWidth:'默认宽度', floatingHeight:'默认高度', floatingFontSize:'字幕字号', floatingWindowHint:'实验性功能：需要支持 Document Picture-in-Picture 的桌面版 Chromium 浏览器（推荐 Chrome / Edge）。打开后可继续拖动窗口边缘调整大小。', floatingUnsupported:'当前浏览器不支持实验性悬浮窗。请使用较新的桌面版 Chrome 或 Edge。', backToWebUI:'返回 WebUI', experimental:'实验性',
     noSession:'尚未创建会话', saved:'已保存', settingsSaved:'设置已保存', ready:'可用', failed:'失败', noAudioDevice:'没有可用的 Windows 音频设备', websocketTimeout:'WebSocket 连接超时', screenshotSaved:'截图已保存', chooseFile:'请选择文件', processing:'处理中…', done:'完成', startupError:'启动错误',
     open:'打开', delete:'删除', deleteConfirm:'删除此会话及其录音和截图？', noSessions:'暂无会话。', segments:'段', notes:'条笔记'
   },
@@ -44,12 +49,14 @@ const I18N = {
     interface:'Interface', language:'Language', languageHint:'The interface language changes immediately and is saved automatically.', type:'Type', name:'Name',
     asrHint:'Default: lightweight Local Faster-Whisper. Remote ASR uses OpenAI Chat Completions.', testAsr:'Test ASR', translationHint:'Bing Free is zero-key but experimental. Use Microsoft Translator or an OpenAI-compatible service for reliable deployments.', testTranslation:'Test translation',
     academicCapture:'Academic & capture', translationMode:'Translation mode', lowestLatency:'Lowest latency', balanced:'Balanced', highestContext:'Highest context', saveAudio:'Save audio', yes:'Yes', no:'No', customGlossary:'Custom glossary', saveSettings:'Save settings',
+    floatingWindow:'Floating window', openFloatingWindow:'Open floating window', closeFloatingWindow:'Close floating window', floatingWindowDesc:'Show live original text and translation in a resizable always-on-top window for Zoom, WebEx, and browser classes.', floatingWidth:'Default width', floatingHeight:'Default height', floatingFontSize:'Subtitle font size', floatingWindowHint:'Experimental: requires a desktop Chromium browser with Document Picture-in-Picture support (Chrome / Edge recommended). You can resize the floating window by dragging its edges.', floatingUnsupported:'This browser does not support the experimental floating window. Please use a recent desktop Chrome or Edge.', backToWebUI:'Back to WebUI', experimental:'Experimental',
     noSession:'No session yet', saved:'Saved', settingsSaved:'Settings saved', ready:'Ready', failed:'Failed', noAudioDevice:'No Windows audio device available', websocketTimeout:'WebSocket timeout', screenshotSaved:'Screenshot saved', chooseFile:'Choose a file', processing:'Processing…', done:'Done', startupError:'Startup error',
     open:'Open', delete:'Delete', deleteConfirm:'Delete this session, its recordings and screenshots?', noSessions:'No sessions yet.', segments:'segments', notes:'notes'
   }
 };
 
 function tr(key){ return (I18N[state.language] && I18N[state.language][key]) || I18N['zh-CN'][key] || key; }
+function clamp(value,min,max){ return Math.min(max,Math.max(min,value)); }
 
 function applyLanguage(language){
   state.language = language === 'en' ? 'en' : 'zh-CN';
@@ -61,6 +68,8 @@ function applyLanguage(language){
   updateViewHeading(active);
   if(!state.session && $('sessionTitle')) $('sessionTitle').value = tr('noSession');
   if($('micBtn')) $('micBtn').textContent = state.listening ? tr('stopListening') : tr('startListening');
+  updateFloatingButtons();
+  renderFloatingWindow();
 }
 
 function toast(t){
@@ -137,6 +146,9 @@ async function loadConfig(){
   $('liveSourceLanguage').value=c.academic.source_language;
   $('liveTargetLanguage').value=target;
   $('uiLanguage').value=state.language;
+  $('floatingWindowWidth').value=c.interface?.floating_window_width||960;
+  $('floatingWindowHeight').value=c.interface?.floating_window_height||420;
+  $('floatingWindowFontSize').value=c.interface?.floating_window_font_size||18;
   providerUI();
 }
 
@@ -144,6 +156,9 @@ function formConfig(){
   const c=structuredClone(state.config);
   c.interface=c.interface||{};
   c.interface.language=$('uiLanguage').value;
+  c.interface.floating_window_width=clamp(Number($('floatingWindowWidth').value)||960,420,2400);
+  c.interface.floating_window_height=clamp(Number($('floatingWindowHeight').value)||420,220,1400);
+  c.interface.floating_window_font_size=clamp(Number($('floatingWindowFontSize').value)||18,12,36);
   c.asr.mode=$('asrMode').value;
   c.asr.name=$('asrName').value.trim()||'ASR';
   c.asr.model=c.asr.mode==='local_whisper'?$('asrModel').value:$('asrModelRemote').value.trim();
@@ -178,6 +193,7 @@ async function saveConfig(){
   $('mtMini').textContent=`${state.config.translation.name} · ${state.config.translation.model}`;
   $('saveStatus').textContent=tr('saved')+' '+new Date().toLocaleTimeString();
   applyLanguage(state.config.interface.language);
+  renderFloatingWindow();
   toast(tr('settingsSaved'));
 }
 
@@ -219,6 +235,7 @@ $('audioSource').onchange=updateDeviceUI;
 async function createSession(){
   state.session=await api('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'live',input_source:$('audioSource').value})});
   state.autoFollow=true;
+  state.floatingAutoFollow=true;
   renderSession({forceLatest:true});
   return state.session;
 }
@@ -278,6 +295,133 @@ function restoreOrFollowScroll(previous,forceLatest=false){
   });
 }
 
+function floatingWindowIsOpen(){
+  return !!(state.floatingWindow && !state.floatingWindow.closed);
+}
+
+function floatingWindowSupported(){
+  return !!(window.documentPictureInPicture && typeof window.documentPictureInPicture.requestWindow==='function');
+}
+
+function updateFloatingButtons(){
+  const open=floatingWindowIsOpen();
+  const liveLabel=$('floatingWindowBtn')?.querySelector('[data-i18n="floatingWindow"]');
+  if(liveLabel) liveLabel.textContent=open?tr('closeFloatingWindow'):tr('floatingWindow');
+  const settingsLabel=$('floatingWindowSettingsBtn')?.querySelector('span');
+  if(settingsLabel) settingsLabel.textContent=open?tr('closeFloatingWindow'):tr('openFloatingWindow');
+}
+
+function floatingWindowStyles(fontSize){
+  return `
+    :root{color-scheme:dark;--bg:#090f1e;--panel:#111a2f;--line:#293550;--text:#f2f5ff;--muted:#8e9bb3;--accent:#8a91ff}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif;overflow:hidden}
+    body{display:grid;grid-template-rows:auto auto 1fr}
+    .bar{height:42px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);background:#0c1426}
+    .brandline{min-width:0;display:flex;align-items:center;gap:8px}.brandline strong{font-size:12px;white-space:nowrap}.session-title{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.badge{font-size:9px;border:1px solid #6d5ca7;background:#241f3f;color:#c8bcff;border-radius:999px;padding:2px 6px}
+    .actions{display:flex;gap:6px;flex:0 0 auto}.actions button{border:1px solid var(--line);background:#172039;color:var(--text);border-radius:7px;padding:5px 8px;cursor:pointer;font-size:10px}.actions button:hover{background:#202b49}
+    .headings{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--line);background:#10182c;position:relative;z-index:2}.headings div{padding:9px 12px;font-size:12px;font-weight:700}.headings div+div{border-left:1px solid var(--line)}
+    .floating-scroll{overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;background:var(--panel)}
+    .row{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--line);min-height:74px}.cell{padding:10px 12px;line-height:1.55;font-size:${fontSize}px;overflow-wrap:anywhere}.cell+.cell{border-left:1px solid var(--line)}.time{display:block;color:var(--muted);font-size:10px;margin-bottom:4px}.empty{height:100%;min-height:140px;display:grid;place-items:center;color:var(--muted);font-size:13px}
+    @media(max-width:560px){.cell{font-size:${Math.max(12,fontSize-2)}px;padding:8px}.bar{height:38px}.brandline strong{display:none}}
+  `;
+}
+
+function renderFloatingWindow({forceLatest=false}={}){
+  if(!floatingWindowIsOpen()) return;
+  const pip=state.floatingWindow;
+  const doc=pip.document;
+  doc.documentElement.lang=state.language;
+  const title=doc.querySelector('[data-role="session-title"]');
+  if(title) title.textContent=state.session?.title||tr('noSession');
+  const originalHeading=doc.querySelector('[data-role="original-heading"]');
+  const translationHeading=doc.querySelector('[data-role="translation-heading"]');
+  const webuiButton=doc.querySelector('[data-role="webui"]');
+  if(originalHeading) originalHeading.textContent=tr('original');
+  if(translationHeading) translationHeading.textContent=tr('translation');
+  if(webuiButton) webuiButton.textContent=tr('backToWebUI');
+  const list=doc.querySelector('[data-role="floating-list"]');
+  if(!list) return;
+  const previous=list.scrollTop;
+  const segments=state.session?.segments||[];
+  if(!segments.length){
+    list.innerHTML=`<div class="empty">${esc(tr('waitingAudio'))}</div>`;
+  }else{
+    list.innerHTML=segments.map(seg=>`<div class="row" data-segment-id="${esc(seg.id||'')}"><div class="cell"><small class="time">${fmt(seg.start_ms)}</small>${esc(seg.source)}</div><div class="cell"><small class="time">${fmt(seg.start_ms)}</small>${esc(seg.translation)}</div></div>`).join('');
+  }
+  const raf=typeof pip.requestAnimationFrame==='function'?pip.requestAnimationFrame.bind(pip):requestAnimationFrame;
+  raf(()=>{
+    state.floatingProgrammatic=true;
+    if(forceLatest || state.floatingAutoFollow){
+      list.scrollTop=list.scrollHeight;
+      state.floatingAutoFollow=true;
+    }else{
+      list.scrollTop=previous;
+    }
+    raf(()=>{state.floatingProgrammatic=false;});
+  });
+}
+
+async function persistFloatingWindowSize(pip){
+  if(!state.config || !floatingWindowIsOpen()) return;
+  const width=clamp(Math.round(pip.innerWidth),420,2400);
+  const height=clamp(Math.round(pip.innerHeight),220,1400);
+  state.config.interface.floating_window_width=width;
+  state.config.interface.floating_window_height=height;
+  if($('floatingWindowWidth')) $('floatingWindowWidth').value=width;
+  if($('floatingWindowHeight')) $('floatingWindowHeight').value=height;
+  clearTimeout(state.floatingResizeTimer);
+  state.floatingResizeTimer=setTimeout(async()=>{
+    try{ await api('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(state.config)}); }catch{}
+  },500);
+}
+
+async function toggleFloatingWindow(){
+  if(floatingWindowIsOpen()){
+    state.floatingWindow.close();
+    state.floatingWindow=null;
+    updateFloatingButtons();
+    return;
+  }
+  if(!floatingWindowSupported()){
+    toast(tr('floatingUnsupported'));
+    return;
+  }
+  const width=clamp(Number($('floatingWindowWidth')?.value || state.config?.interface?.floating_window_width || 960),420,2400);
+  const height=clamp(Number($('floatingWindowHeight')?.value || state.config?.interface?.floating_window_height || 420),220,1400);
+  const fontSize=clamp(Number($('floatingWindowFontSize')?.value || state.config?.interface?.floating_window_font_size || 18),12,36);
+  try{
+    const pip=await window.documentPictureInPicture.requestWindow({width,height});
+    state.floatingWindow=pip;
+    state.floatingAutoFollow=true;
+    pip.document.title='Academic Live Translator beta 0.2';
+    const style=pip.document.createElement('style');
+    style.textContent=floatingWindowStyles(fontSize);
+    pip.document.head.appendChild(style);
+    pip.document.body.innerHTML=`
+      <div class="bar"><div class="brandline"><strong>Academic Live Translator</strong><span class="badge">Experimental</span><span class="session-title" data-role="session-title"></span></div><div class="actions"><button data-role="webui"></button><button data-role="close">×</button></div></div>
+      <div class="headings"><div data-role="original-heading"></div><div data-role="translation-heading"></div></div>
+      <div class="floating-scroll" data-role="floating-list"></div>`;
+    const list=pip.document.querySelector('[data-role="floating-list"]');
+    list.addEventListener('scroll',()=>{
+      if(state.floatingProgrammatic) return;
+      state.floatingAutoFollow=isNearBottom(list,48);
+    },{passive:true});
+    pip.document.querySelector('[data-role="webui"]').onclick=()=>window.focus();
+    pip.document.querySelector('[data-role="close"]').onclick=()=>pip.close();
+    pip.addEventListener('resize',()=>persistFloatingWindowSize(pip));
+    pip.addEventListener('pagehide',()=>{
+      state.floatingWindow=null;
+      state.floatingAutoFollow=true;
+      updateFloatingButtons();
+    },{once:true});
+    updateFloatingButtons();
+    renderFloatingWindow({forceLatest:true});
+  }catch(e){
+    toast(e.message||tr('floatingUnsupported'));
+  }
+}
+
 function renderSession({forceLatest=false}={}){
   const s=state.session;if(!s)return;
   $('sessionTitle').value=s.title;$('sessionTitle').disabled=false;
@@ -293,6 +437,7 @@ function renderSession({forceLatest=false}={}){
   }
   renderNotes();
   restoreOrFollowScroll(previous,forceLatest);
+  renderFloatingWindow({forceLatest});
 }
 
 function renderNotes(){
@@ -365,6 +510,8 @@ async function stopListening(){
   $('micBtn').textContent=tr('startListening');setTimeout(refreshSession,700);
 }
 $('micBtn').onclick=()=>state.listening?stopListening():startListening();
+$('floatingWindowBtn').onclick=toggleFloatingWindow;
+$('floatingWindowSettingsBtn').onclick=toggleFloatingWindow;
 
 async function mark(kind,text=''){
   if(!state.session)await createSession();
@@ -382,6 +529,7 @@ async function loadSessions(){
     el.querySelector('.open').onclick=async()=>{
       state.session=await api('/api/sessions/'+el.dataset.id);
       state.autoFollow=true;
+      state.floatingAutoFollow=true;
       renderSession({forceLatest:true});
       switchView('live');
     };
@@ -397,13 +545,15 @@ $('processFileBtn').onclick=async()=>{
   try{
     state.session=await api('/api/process-file?title='+encodeURIComponent($('mediaTitle').value.trim()),{method:'POST',body:fd});
     state.autoFollow=true;
+    state.floatingAutoFollow=true;
     $('mediaStatus').textContent=`${tr('done')}: ${state.session.segments.length} ${tr('segments')}`;
     renderSession({forceLatest:true});switchView('live');
   }catch(e){$('mediaStatus').textContent=e.message}
 };
 
-$('sessionTitle').onchange=async()=>{if(state.session)state.session=await api('/api/sessions/'+state.session.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:$('sessionTitle').value})})};
+$('sessionTitle').onchange=async()=>{if(state.session){state.session=await api('/api/sessions/'+state.session.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:$('sessionTitle').value})});renderFloatingWindow();}};
 
 setupTranscriptScrollSync();
+updateFloatingButtons();
 
 (async()=>{try{await loadConfig();await loadDevices();await loadSessions()}catch(e){toast(tr('startupError')+': '+e.message)}})();
