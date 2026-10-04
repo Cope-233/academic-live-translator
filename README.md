@@ -1,38 +1,40 @@
 # Academic Live Translator
 
-**beta01 · WebUI · portable by default**
+[简体中文](./README.md) | [English](./README.en.md)
 
-Academic Live Translator is a local-first WebUI for real-time transcription, translation, and academic session capture. It is designed for lectures, seminars, conferences, meetings, interviews, and recorded media.
+**beta01 · WebUI · 默认便携模式**
 
-> This project is currently in beta. Pre-release builds use `betaXX` identifiers. Standard semantic version numbers will begin with the first stable release.
+Academic Live Translator 是一个本地优先的 WebUI，用于实时语音转录、翻译与学术场景记录。它面向课堂、研讨会、学术会议、日常会议、访谈以及已有音视频材料等使用场景。
 
-## Highlights
+> 本项目目前处于 Beta 阶段。预发布版本统一使用 `betaXX` 作为版本标识；首个稳定版本发布后再开始使用正式的语义化版本号。
 
-- Real-time bilingual transcript workspace
-- Browser microphone, browser tab/screen audio, Windows WASAPI loopback, and media-file input
-- Academic glossary profiles and custom terminology
-- Important / Question / Idea / Reference / Follow-up / Note markers
-- Screenshot capture for slides
-- Searchable session Library with delete support
-- TXT, Markdown, SRT, and JSON export
-- Local Faster-Whisper default ASR
-- Bing Free translation for zero-key first-run testing (experimental)
-- Microsoft Translator and generic OpenAI-compatible providers
-- llama.cpp, vLLM, LM Studio, LocalAI, and similar services can be connected through OpenAI-compatible endpoints
+## 主要功能
 
-## Portable-by-default storage
+- 实时双语转录工作区
+- 支持浏览器麦克风、浏览器标签页/屏幕音频、Windows WASAPI 系统音频回环以及音视频文件输入
+- 学术术语表 Profile 与自定义术语
+- Important / Question / Idea / Reference / Follow-up / Note 等学术标记
+- 课程 PPT / 屏幕截图记录
+- 支持全文搜索与删除的 Session Library
+- 支持导出 TXT、Markdown、SRT 与 JSON
+- 默认使用本地 Faster-Whisper 进行 ASR
+- 首次使用可选择无需 API Key 的 Bing Free 翻译（实验性）
+- 支持 Microsoft Translator 与通用 OpenAI-compatible Provider
+- llama.cpp、vLLM、LM Studio、LocalAI 等服务均可通过 OpenAI-compatible 接口接入
 
-The application does **not** use AppData for its own runtime data. By default everything created or downloaded by Academic Live Translator stays under the project directory:
+## 默认 Portable 存储
+
+应用自身的运行数据默认**不会写入 AppData**。Academic Live Translator 创建或下载的内容会集中保存在项目目录中：
 
 ```text
 academic-live-translator/
-├─ .venv/              # Python environment
+├─ .venv/              # Python 虚拟环境
 ├─ data/
 │  ├─ config.json
 │  ├─ sessions/
-│  └─ assets/          # recordings and screenshots
+│  └─ assets/          # 录音与截图
 ├─ models/
-│  └─ faster-whisper/  # automatically downloaded local ASR models
+│  └─ faster-whisper/  # 自动下载的本地 ASR 模型
 ├─ cache/
 │  ├─ huggingface/
 │  ├─ pip/
@@ -43,62 +45,64 @@ academic-live-translator/
 └─ start_webui.ps1
 ```
 
-These runtime folders are ignored by Git, so personal transcripts, recordings, screenshots, model files, and caches are not accidentally committed.
+这些运行时目录都已加入 `.gitignore`，因此个人转录记录、录音、截图、模型文件以及缓存不会被意外提交到 Git 仓库。
 
-You can override storage locations with `ALT_DATA_DIR`, `ALT_MODELS_DIR`, `ALT_CACHE_DIR`, or `ALT_LOGS_DIR`.
+如果需要自定义存储位置，可以使用 `ALT_DATA_DIR`、`ALT_MODELS_DIR`、`ALT_CACHE_DIR` 或 `ALT_LOGS_DIR` 环境变量覆盖默认路径。
 
-## Requirements
+## 前置条件
 
 - Python 3.11–3.13
-- Windows 10/11 for native WASAPI loopback capture
-- Chrome / Edge recommended for browser audio capture
-- FFmpeg recommended for media conversion and FLAC recording
-- GPU is optional. The default Faster-Whisper `base` model can run on CPU.
+- 如需原生 WASAPI 系统音频捕获，需要 Windows 10/11
+- 浏览器音频捕获推荐使用 Chrome / Edge
+- 推荐安装 FFmpeg，用于媒体格式转换与 FLAC 录音
+- GPU 不是必需条件。默认的 Faster-Whisper `base` 模型可以直接使用 CPU 运行
 
-## Windows quick start
+## Windows 快速开始
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 .\start_webui.ps1
 ```
 
-The script will:
+启动脚本会自动：
 
-1. create `.venv/` inside the project;
-2. install dependencies using the project-local pip cache;
-3. download the default Faster-Whisper model into `models/faster-whisper/` on first run;
-4. start the WebUI at `http://127.0.0.1:8765`.
+1. 在项目目录中创建 `.venv/`；
+2. 使用项目内的 pip 缓存安装依赖；
+3. 首次运行时将默认 Faster-Whisper 模型下载到 `models/faster-whisper/`；
+4. 启动 WebUI：`http://127.0.0.1:8765`。
 
-The launcher works with both a normal Python installation and Conda as long as `python` is available in PowerShell.
+只要 PowerShell 中能够执行 `python`，启动脚本即可同时兼容普通 Python 安装和 Conda 环境。
 
-## Linux / macOS quick start
+## Linux / macOS 快速开始
 
 ```bash
 chmod +x start_webui.sh
 ./start_webui.sh
 ```
 
-Native Windows system-audio capture is unavailable on Linux/macOS, but browser microphone/tab/screen capture and media-file workflows remain available.
+Linux/macOS 暂不支持 Windows 原生 WASAPI 系统音频捕获，但浏览器麦克风、标签页/屏幕音频捕获以及 Media 文件处理功能仍然可以使用。
 
-## Default providers
+## 默认 Provider
 
-### ASR: Local Faster-Whisper
+### ASR：Local Faster-Whisper
 
-Default model: `base`. It is downloaded automatically on first run. You can switch to `tiny`, `small`, `medium`, or `large-v3-turbo` in Settings.
+默认模型为 `base`，首次启动时自动下载。之后可以在 Settings 中切换为 `tiny`、`small`、`medium` 或 `large-v3-turbo`。
 
-### Translation: Bing Free (experimental)
+### 翻译：Bing Free（实验性）
 
-This option requires no API key and is intended to make first-run testing easy. It relies on an unofficial web interface and may break if Bing changes its frontend. For reliable long-term use, choose Microsoft Translator or an OpenAI-compatible service.
+该选项不需要 API Key，主要用于降低首次部署和测试门槛。它依赖非官方 Web 接口，因此如果 Bing 调整前端接口，功能可能暂时失效。
 
-## OpenAI-compatible providers
+如果需要长期、稳定使用，建议切换到 Microsoft Translator 或 OpenAI-compatible 翻译服务。
 
-Both ASR and translation can use compatible APIs. For example, a llama.cpp router hosting multiple models can use the same base URL for both providers:
+## OpenAI-compatible Provider
+
+ASR 与翻译都可以使用兼容 OpenAI API 的服务。例如，当 llama.cpp Router 同时托管多个模型时，ASR 和翻译可以共用同一个 Base URL：
 
 ```text
 ASR
 Base URL: http://127.0.0.1:8080/v1
 Model: <ASR model id>
-Mode: OpenAI /audio/transcriptions or Chat + input_audio
+Mode: OpenAI /audio/transcriptions 或 Chat + input_audio
 
 Translation
 Base URL: http://127.0.0.1:8080/v1
@@ -106,37 +110,39 @@ Model: <translation model id>
 Mode: OpenAI Chat Completions
 ```
 
-No dedicated llama.cpp mode is required.
+因此项目不需要单独提供 llama.cpp 专属模式。
 
-## Live input options
+## 实时音频输入
 
-- Browser microphone
-- Browser tab / screen audio
-- Browser system audio + microphone mix
-- Windows system audio via WASAPI loopback
-- Windows native microphone
-- Audio / video files
+当前支持：
 
-For online classes played by Chrome, Zoom, Teams, VLC, or similar applications on Windows, WASAPI loopback is usually the cleanest source because it captures the digital playback stream directly.
+- 浏览器麦克风
+- 浏览器标签页 / 屏幕音频
+- 浏览器系统音频 + 麦克风混合
+- Windows WASAPI 系统音频回环
+- Windows 原生麦克风
+- 音频 / 视频文件
 
-## Academic workflow
+对于 Windows 上通过 Chrome、Zoom、Teams、VLC 等播放的在线课程，通常推荐使用 WASAPI loopback。它直接捕获系统数字音频流，即使使用耳机也无需让麦克风重新录制扬声器声音。
 
-During a live session you can:
+## 学术工作流
 
-- see original text and translation side-by-side;
-- add terminology profiles;
-- mark content as Important, Question, Idea, Reference, Follow-up, or Note;
-- capture the current screen as a slide snapshot;
-- save session audio;
-- export the session to Markdown, TXT, SRT, or JSON.
+在实时 Session 中，你可以：
 
-## Migration from older local builds
+- 同时查看原始转录与翻译；
+- 使用学术术语 Profile 或自定义术语；
+- 将内容标记为 Important、Question、Idea、Reference、Follow-up 或 Note；
+- 截取当前屏幕并作为课程/PPT快照保存；
+- 保存 Session 音频；
+- 将完整 Session 导出为 Markdown、TXT、SRT 或 JSON。
 
-`beta01` intentionally **does not automatically reuse** v0.1/v0.2/v0.3 AppData folders. This prevents surprising cross-version records and hidden C-drive usage.
+## 从旧版迁移
 
-If you want to keep older sessions, copy the desired session JSON files and matching assets manually into the new portable `data/` directory after making a backup.
+`beta01` **不会自动复用** v0.1 / v0.2 / v0.3 曾经位于 AppData 中的数据目录。这样可以避免不同版本之间意外共享 Session，同时避免应用数据隐藏占用系统盘。
 
-## Development
+如果需要保留旧 Session，请先备份旧数据，再将需要的 Session JSON 与对应 assets 手动复制到新的 portable `data/` 目录中。
+
+## 开发
 
 ```bash
 python -m venv .venv
@@ -147,4 +153,4 @@ pytest
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+本项目采用 MIT License，详见 [LICENSE](LICENSE)。
