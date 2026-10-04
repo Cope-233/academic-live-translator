@@ -1,5 +1,23 @@
 # Changelog
 
+## beta 0.4 — 2026-10-04
+
+Local Whisper / Bing reliability and one-click portable installation beta.
+
+- Decoupled live ASR from translation: a recognized source segment is now saved and displayed immediately, then updated in place when translation finishes.
+- Translation failures no longer hide or discard successfully recognized Whisper text.
+- Added stage-specific live error logging for ASR and translation failures.
+- Fixed Bing Free response handling by extracting `translations[0].text` instead of stringifying the complete response object.
+- Added Bing-specific language mapping, including `auto-detect`, `zh-Hans`, and `zh-Hant`.
+- Local Whisper provider tests now execute a real inference pass instead of checking model construction only, exposing missing CUDA runtime libraries such as `cublas64_12.dll` before a live session.
+- Local Whisper can load directly from project-local model folders under `models/faster-whisper/<model>/`.
+- Added a Windows one-click installer: `install.bat` / `install.ps1` creates `.venv`, installs dependencies, and prepares all five supported Whisper models (`tiny`, `base`, `small`, `medium`, `large-v3-turbo`).
+- On Windows systems with an NVIDIA GPU, the installer also prepares a project-local CUDA 12 cuBLAS/cuDNN runtime under `runtime/cuda12/bin` without changing the system-wide CUDA installation.
+- Added real CPU and CUDA Whisper inference self-tests during installation; CUDA failure leaves CPU mode available and reports the failure explicitly.
+- Added `start_webui.bat`; the first launch automatically invokes the one-click installer when beta 0.4 assets are not yet prepared.
+- Local Whisper and Bing modes now clear stale OpenAI-compatible/llama.cpp fields when settings are saved.
+- Portable runtime downloads are excluded from Git through `runtime/`.
+
 ## beta 0.3 — 2026-10-04
 
 Windows native-microphone reliability beta.
