@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Academic Live Translator beta01</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><b>ALT</b><div><strong>Academic Live Translator</strong><span>beta01 · WebUI</span></div></div>
+    <nav><button class="nav active" data-view="live">◉ Live</button><button class="nav" data-view="media">▣ Media</button><button class="nav" data-view="library">▤ Library</button><button class="nav" data-view="settings">⚙ Settings</button></nav>
+    <div class="mini"><span>ASR</span><b id="asrMini">—</b></div><div class="mini"><span>Translation</span><b id="mtMini">—</b></div>
+  </aside>
+  <main>
+    <header><div><h1 id="viewTitle">Live Workspace</h1><p id="viewSubtitle">课程、会议、访谈与线上活动共用一个实时双语工作区。</p></div><button id="newSessionBtn">+ New Session</button></header>
+    <section id="live" class="view active">
+      <div class="card controls">
+        <label>Audio source<select id="audioSource"><option value="microphone">Browser microphone</option><option value="browser_system">Browser tab / screen audio</option><option value="browser_mix">Browser system + microphone</option><option value="native_system">Windows system audio (WASAPI)</option><option value="native_microphone">Windows native microphone</option></select></label>
+        <label id="nativeDeviceWrap" hidden>Device<select id="nativeDevice"></select></label>
+        <label>Source<select id="liveSourceLanguage"><option value="auto">Auto</option><option value="English">English</option><option value="Chinese">Chinese</option><option value="Malay">Malay</option></select></label>
+        <label>Target<select id="liveTargetLanguage"><option value="Chinese">Chinese</option><option value="English">English</option><option value="Malay">Malay</option></select></label>
+        <button id="micBtn" class="primary">Start listening</button>
+      </div>
+      <div class="sessionbar"><input id="sessionTitle" value="尚未创建会话" disabled><div><button id="quickImportant">⭐</button><button id="quickQuestion">❓</button><button id="quickIdea">💡</button><button id="captureSlideBtn">📷</button></div></div>
+      <div class="workspace">
+        <div class="card transcript"><h3>ORIGINAL <span id="asrStatus">Idle</span></h3><div id="originalList" class="scroll empty">等待音频输入…</div></div>
+        <div class="card transcript"><h3>TRANSLATION</h3><div id="translationList" class="scroll empty">译文将在这里出现…</div></div>
+        <aside class="card notes"><h3>Academic Notes</h3><textarea id="noteText" rows="3" placeholder="研究想法、追问、待办…"></textarea><select id="noteKind"><option value="note">📝 Note</option><option value="important">⭐ Important</option><option value="question">❓ Question</option><option value="idea">💡 Idea</option><option value="reference">📚 Reference</option><option value="follow_up">⚠ Follow up</option></select><button id="saveNoteBtn">Save note</button><div id="annotationList" class="list"></div></aside>
+      </div>
+    </section>
+    <section id="media" class="view"><div class="card pad"><h2>Media transcription</h2><p>Audio / video → ASR → translation → timestamped session.</p><input id="mediaFile" type="file" accept="audio/*,video/*"><input id="mediaTitle" placeholder="Session title"><button id="processFileBtn" class="primary">Process media</button><p id="mediaStatus"></p></div></section>
+    <section id="library" class="view"><div class="toolbar"><input id="sessionSearch" placeholder="Search transcript, translation or notes"><button id="refreshSessionsBtn">Refresh</button></div><div id="sessionList" class="card"></div></section>
+    <section id="settings" class="view"><div class="settings">
+      <div class="card pad"><h2>ASR Provider</h2><p class="muted">Default: lightweight Local Faster-Whisper. OpenAI-compatible covers llama.cpp, vLLM, LM Studio, LocalAI and similar services.</p><label>Type<select id="asrMode"><option value="local_whisper">Local Faster-Whisper</option><option value="openai_transcriptions">OpenAI /audio/transcriptions</option><option value="openai_chat_audio">OpenAI Chat + input_audio</option></select></label><label>Name<input id="asrName"></label><div id="asrLocal"><label>Whisper model<select id="asrModel"><option value="tiny">tiny</option><option value="base">base</option><option value="small">small</option><option value="medium">medium</option><option value="large-v3-turbo">large-v3-turbo</option></select></label><label>Device<select id="asrDevice"><option value="auto">Auto</option><option value="cpu">CPU</option><option value="cuda">CUDA</option></select></label><label>Compute<input id="asrCompute"></label></div><div id="asrRemote"><label>Base URL<input id="asrBaseUrl" placeholder="http://127.0.0.1:8080/v1"></label><label>Model<input id="asrModelRemote"></label><label>API key<input id="asrApiKey" type="password"></label><label>Custom endpoint<input id="asrEndpoint"></label></div><button id="testAsrBtn">Test ASR</button><small id="asrTestResult"></small></div>
+      <div class="card pad"><h2>Translation Provider</h2><p class="muted">Bing Free is zero-key but experimental. Use Microsoft Translator or OpenAI-compatible for reliable deployments.</p><label>Type<select id="mtMode"><option value="bing_web">Bing Free (experimental)</option><option value="azure_translator">Microsoft Translator</option><option value="openai_chat">OpenAI Chat Completions</option></select></label><label>Name<input id="mtName"></label><div id="mtOpenAI"><label>Base URL<input id="mtBaseUrl"></label><label>Model<input id="mtModel"></label><label>API key<input id="mtApiKey" type="password"></label></div><div id="mtAzure"><label>API key<input id="mtAzureKey" type="password"></label><label>Region<input id="mtRegion"></label></div><button id="testMtBtn">Test translation</button><small id="mtTestResult"></small></div>
+      <div class="card pad wide"><h2>Academic & capture</h2><div class="grid"><label>Source<input id="sourceLanguage"></label><label>Target<input id="targetLanguage"></label><label>Translation mode<select id="translationMode"><option value="low_latency">Lowest latency</option><option value="balanced">Balanced</option><option value="context">Highest context</option></select></label><label>Silence end (ms)<input id="silenceMs" type="number"></label><label>Min speech (ms)<input id="minSpeechMs" type="number"></label><label>Max segment (ms)<input id="maxSegmentMs" type="number"></label><label>Save audio<select id="saveAudio"><option value="true">Yes</option><option value="false">No</option></select></label><label>Audio format<select id="audioFormat"><option value="flac">FLAC</option><option value="wav">WAV</option></select></label></div><label>Custom glossary<textarea id="glossary" rows="7"></textarea></label><button id="saveSettingsBtn" class="primary">Save settings</button><p id="saveStatus" class="muted"></p></div>
+    </div></section>
+  </main>
+</div><div id="toast"></div><script src="/static/app.js"></script></body></html>

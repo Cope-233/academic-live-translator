@@ -1,0 +1,24 @@
+# Portable runtime data
+.venv/
+data/
+models/
+cache/
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local secrets / overrides
+.env
+.env.*
+!config.example.json

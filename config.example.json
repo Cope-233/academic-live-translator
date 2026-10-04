@@ -1,0 +1,33 @@
+{
+  "asr": {
+    "name": "Local Whisper",
+    "mode": "local_whisper",
+    "base_url": "",
+    "api_key": "",
+    "model": "base",
+    "endpoint": null,
+    "timeout_seconds": 120.0,
+    "temperature": 0.0,
+    "max_tokens": 4096,
+    "device": "auto",
+    "compute_type": "auto",
+    "region": ""
+  },
+  "translation": {
+    "name": "Bing Translate (Free)",
+    "mode": "bing_web",
+    "base_url": "",
+    "api_key": "",
+    "model": "bing",
+    "endpoint": null,
+    "timeout_seconds": 120.0,
+    "temperature": 0.0,
+    "max_tokens": 4096,
+    "device": "auto",
+    "compute_type": "auto",
+    "region": ""
+  },
+  "live": {"sample_rate":16000,"speech_threshold":0.01,"silence_ms":420,"min_speech_ms":280,"max_segment_ms":12000,"pre_roll_ms":220},
+  "capture": {"input_source":"microphone","native_output_device":null,"native_input_device":null,"save_audio":true,"audio_format":"flac","screenshot_monitor":1,"system_gain":1.0,"microphone_gain":0.85},
+  "academic": {"source_language":"auto","target_language":"Chinese","glossary":"","glossary_profiles":{"General":""},"active_glossary_profile":"General","translation_mode":"low_latency","context_segments":1,"preserve_academic_terms":true,"translation_prompt":"Translate the CURRENT text into {target_language}. Preserve academic terminology, proper nouns, abbreviations, numbers, and citations. Use the context only to resolve references and terminology. Output only the translation of CURRENT.\n\n{glossary_block}{context_block}CURRENT:\n{text}"}
+}

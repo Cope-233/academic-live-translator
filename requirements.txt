@@ -1,0 +1,10 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+httpx>=0.28,<1
+python-multipart>=0.0.20,<1
+pydantic>=2.10,<3
+numpy>=2.0,<3
+mss==10.2.0
+faster-whisper==1.2.1
+mintrans==1.1.0
+PyAudioWPatch==0.2.12.8; sys_platform == "win32"
