@@ -1,4 +1,4 @@
-"""Portable first-run installer for Academic Live Translator beta 0.4.
+"""Portable first-run installer for Academic Live Translator beta 0.5.
 
 Downloads the five supported Faster-Whisper models into project-local folders and,
 on Windows with an NVIDIA GPU, prepares the CUDA 12 cuBLAS/cuDNN runtime under
@@ -24,7 +24,7 @@ CUDA_RUNTIME_URL = (
 )
 RUNTIME_DIR = PROJECT_ROOT / "runtime"
 CUDA_BIN = RUNTIME_DIR / "cuda12" / "bin"
-INSTALL_MARKER = DATA_DIR / ".installed-beta-0.4"
+INSTALL_MARKER = DATA_DIR / ".installed-beta-0.5"
 _DLL_HANDLES: list[object] = []
 
 
@@ -59,6 +59,30 @@ def _activate_cuda_runtime() -> None:
         _DLL_HANDLES.append(os.add_dll_directory(str(CUDA_BIN)))
 
 
+def _extract_cuda_archive(archive: Path, destination: Path) -> None:
+    if sys.platform == "win32":
+        windows_tar = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32" / "tar.exe"
+        if not windows_tar.exists():
+            raise RuntimeError("Windows tar.exe is required to extract the CUDA runtime archive")
+        result = subprocess.run(
+            [str(windows_tar), "-xf", str(archive), "-C", str(destination)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()
+            raise RuntimeError(
+                f"Windows tar.exe could not extract the CUDA runtime archive "
+                f"(exit code {result.returncode}): {detail}"
+            )
+        return
+
+    import py7zr
+
+    with py7zr.SevenZipFile(archive, mode="r") as seven:
+        seven.extractall(path=destination)
+
+
 def download_whisper_models() -> None:
     from faster_whisper.utils import download_model
 
@@ -91,8 +115,6 @@ def download_cuda_runtime() -> bool:
         _activate_cuda_runtime()
         return True
 
-    import py7zr
-
     downloads = CACHE_DIR / "downloads"
     downloads.mkdir(parents=True, exist_ok=True)
     archive = downloads / "cuBLAS.and.cuDNN_CUDA12_win_v3.7z"
@@ -104,8 +126,7 @@ def download_cuda_runtime() -> bool:
     with tempfile.TemporaryDirectory(prefix="alt-cuda-", dir=str(CACHE_DIR / "temp")) as temp_dir:
         temp = Path(temp_dir)
         print("[setup] Extracting portable CUDA runtime...")
-        with py7zr.SevenZipFile(archive, mode="r") as seven:
-            seven.extractall(path=temp)
+        _extract_cuda_archive(archive, temp)
         dlls = list(temp.rglob("*.dll"))
         if not dlls:
             raise RuntimeError("CUDA runtime archive contained no DLL files")
@@ -151,17 +172,17 @@ def self_test(cuda_installed: bool) -> None:
             del gpu
             print("[setup] Self-test: Whisper CUDA OK")
         except Exception as exc:
-            print(f"[setup] WARNING: CUDA self-test failed; CPU mode remains available: {exc}")
+            raise RuntimeError(f"CUDA Whisper inference self-test failed: {exc}") from exc
 
 
 def main() -> None:
     (CACHE_DIR / "temp").mkdir(parents=True, exist_ok=True)
-    print("[setup] Academic Live Translator beta 0.4 portable assets")
+    print("[setup] Academic Live Translator beta 0.5 portable assets")
     print("[setup] CPU runtime is provided by the installed CTranslate2/faster-whisper package.")
     download_whisper_models()
     cuda_installed = download_cuda_runtime()
     self_test(cuda_installed)
-    INSTALL_MARKER.write_text("beta 0.4\n", encoding="utf-8")
+    INSTALL_MARKER.write_text("beta 0.5\n", encoding="utf-8")
     print("[setup] Portable installation complete.")
 
 

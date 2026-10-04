@@ -2,15 +2,17 @@
 
 [简体中文](./README.md) | **English**
 
-**beta 0.4 · WebUI · portable by default**
+**beta 0.5 · WebUI · portable by default**
 
 Academic Live Translator is a local-first WebUI for real-time transcription, translation, and academic session capture. It is designed for lectures, seminars, conferences, meetings, interviews, and recorded media.
 
 > Beta builds use `beta x.y` identifiers. Standard semantic versioning will begin with the first stable release.
 
-## beta 0.4: Whisper/Bing fixes and one-click installation
+## beta 0.5: Whisper/Bing and Windows installer fixes
 
-beta 0.4 focuses on Local Faster-Whisper reliability, Bing Free translation, and a beginner-friendly Windows installation flow.
+beta 0.5 fixes beta 0.4's Windows CUDA runtime extraction failure, Whisper auto-CUDA inference failure, and a startup race where settings or capture actions could run before configuration loaded. The immediate Whisper transcript display and Bing response parsing were also verified through real provider and browser-audio tests.
+
+The Windows installer now extracts the CUDA bundle with the built-in `tar.exe`, because the archive uses the BCJ2 filter that `py7zr` does not support. It checks dependency and asset-install exit codes and requires the real CUDA inference self-test to pass before writing the completion marker. The app registers the project-local CUDA DLL directory itself, including when started directly. Native WASAPI capture now reports success when the device opens instead of waiting for the first audio frame, so quiet input is not mistaken for a startup failure.
 
 ### Live pipeline fix
 
@@ -54,7 +56,7 @@ Or simply double-click:
 start_webui.bat
 ```
 
-If beta 0.4 has not been initialized yet, `start_webui.bat` automatically runs the full installer first and then starts the WebUI.
+If beta 0.5 has not been initialized yet, `start_webui.bat` automatically runs the full installer first and then starts the WebUI.
 
 The installer automatically:
 
@@ -150,7 +152,7 @@ academic-live-translator/
 
 ### ASR: Local Faster-Whisper
 
-The default model is `base`. A beta 0.4 full install prepares all five models in advance, so switching models later does not require another model download.
+The default model is `base`. A beta 0.5 full install prepares all five models in advance, so switching models later does not require another model download.
 
 CPU mode requires no CUDA. On Windows with an NVIDIA GPU, the one-click installer prepares the required runtime inside the project. Use the supplied launcher so `runtime/cuda12/bin` is added only to the application process PATH.
 
@@ -191,13 +193,13 @@ chmod +x start_webui.sh
 ./start_webui.sh
 ```
 
-Linux/macOS support browser microphone, tab/screen capture, and media-file workflows. Windows WASAPI capture and the beta 0.4 Windows CUDA bundle do not apply; GPU runtime libraries must be prepared according to the selected platform.
+Linux/macOS support browser microphone, tab/screen capture, and media-file workflows. Windows WASAPI capture and the Windows CUDA bundle do not apply; GPU runtime libraries must be prepared according to the selected platform.
 
 ## Upgrading from older betas
 
-beta 0.4 keeps portable-by-default storage. Existing `data/config.json` and Sessions remain usable.
+beta 0.5 keeps portable-by-default storage. Existing `data/config.json` and Sessions remain usable.
 
-On the first beta 0.4 start, the launcher checks for `data/.installed-beta-0.4`. If it is missing, the new full installation flow runs automatically. Older Hugging Face caches are not deleted; beta 0.4 creates explicit project-local folders for all five supported Whisper models.
+On the first beta 0.5 start, the launcher checks for `data/.installed-beta-0.5`. If it is missing, the full installation flow runs automatically. Older Hugging Face caches are not deleted; all five supported Whisper models and the CUDA runtime are kept inside the project.
 
 ## Development
 

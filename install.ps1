@@ -33,13 +33,19 @@ if (-not (Test-Path ".venv\Scripts\python.exe")) {
 $venvPython = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
 Write-Host "[setup] Installing Python dependencies..."
 & $venvPython -m pip install --disable-pip-version-check --upgrade pip
+if ($LASTEXITCODE -ne 0) { throw "Failed to upgrade pip (exit code $LASTEXITCODE)." }
 & $venvPython -m pip install --disable-pip-version-check -r requirements.txt
+if ($LASTEXITCODE -ne 0) { throw "Failed to install Python dependencies (exit code $LASTEXITCODE)." }
 
 Write-Host "[setup] Downloading all local Whisper models and portable runtime files..."
 & $venvPython -m app.install_assets
+if ($LASTEXITCODE -ne 0) { throw "Portable model/runtime installation failed (exit code $LASTEXITCODE)." }
+if (-not (Test-Path (Join-Path $PSScriptRoot "data\.installed-beta-0.5"))) {
+    throw "Portable installation did not create the beta 0.5 completion marker."
+}
 
 Write-Host ""
-Write-Host "[done] Academic Live Translator beta 0.4 is installed."
+Write-Host "[done] Academic Live Translator beta 0.5 is installed."
 Write-Host "[done] Models: .\models\faster-whisper\"
 Write-Host "[done] CUDA runtime (when NVIDIA is detected): .\runtime\cuda12\bin\"
 Write-Host "[done] Start with start_webui.bat or start_webui.ps1"

@@ -153,9 +153,17 @@ class NativeAudioCapture:
         self.loop = loop
         self.queue = queue
         self._stop = threading.Event()
+        self._ready_event = threading.Event()
         self._thread = None
         self.error = None
         self.info = None
+
+    def wait_until_ready(self, timeout: float = 5.0):
+        if not self._ready_event.wait(timeout):
+            raise TimeoutError(f"Timed out opening WASAPI input device {self.device_index}.")
+        if self.error:
+            raise RuntimeError(self.error)
+        return self.info
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -245,6 +253,7 @@ class NativeAudioCapture:
                     rate,
                     channels,
                 )
+                self._ready_event.set()
 
                 try:
                     while not self._stop.is_set():
@@ -258,4 +267,5 @@ class NativeAudioCapture:
                     stream.close()
         except Exception as exc:
             self.error = str(exc)
+            self._ready_event.set()
             self._signal_error()

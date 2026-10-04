@@ -3,6 +3,7 @@ const q = s => [...document.querySelectorAll(s)];
 
 const state = {
   config: null,
+  configLoading: null,
   session: null,
   ws: null,
   ctx: null,
@@ -150,6 +151,15 @@ async function loadConfig(){
   $('floatingWindowHeight').value=c.interface?.floating_window_height||420;
   $('floatingWindowFontSize').value=c.interface?.floating_window_font_size||18;
   providerUI();
+  return state.config;
+}
+
+function ensureConfigLoaded(){
+  if(state.config) return Promise.resolve(state.config);
+  if(!state.configLoading){
+    state.configLoading=loadConfig().finally(()=>{state.configLoading=null;});
+  }
+  return state.configLoading;
 }
 
 function formConfig(){
@@ -187,6 +197,7 @@ function formConfig(){
 }
 
 async function saveConfig(){
+  await ensureConfigLoaded();
   state.config=formConfig();
   await api('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(state.config)});
   $('asrMini').textContent=`${state.config.asr.name} · ${state.config.asr.model}`;
@@ -198,7 +209,7 @@ async function saveConfig(){
 }
 
 async function saveUILanguage(){
-  if(!state.config) return;
+  await ensureConfigLoaded();
   state.config.interface=state.config.interface||{};
   state.config.interface.language=$('uiLanguage').value;
   applyLanguage(state.config.interface.language);
@@ -446,6 +457,7 @@ function renderNotes(){
 async function refreshSession(){ if(state.session){ state.session=await api('/api/sessions/'+state.session.id); renderSession(); } }
 
 async function syncLive(){
+  await ensureConfigLoaded();
   const target=$('liveTargetLanguage').value||'Chinese';
   state.config.academic.source_language=$('liveSourceLanguage').value;
   state.config.academic.target_language=target;
@@ -556,4 +568,4 @@ $('sessionTitle').onchange=async()=>{if(state.session){state.session=await api('
 setupTranscriptScrollSync();
 updateFloatingButtons();
 
-(async()=>{try{await loadConfig();await loadDevices();await loadSessions()}catch(e){toast(tr('startupError')+': '+e.message)}})();
+(async()=>{try{await ensureConfigLoaded();await loadDevices();await loadSessions()}catch(e){toast(tr('startupError')+': '+e.message)}})();

@@ -1,12 +1,17 @@
+import subprocess
+
+import pytest
+
+from app import install_assets
 from app import __version__
 from app.models import AppConfig
 from app.config import CACHE_DIR, DATA_DIR, MODELS_DIR, PROJECT_ROOT, _migrate_config
-from app.native_capture import _capture_candidates
+from app.native_capture import NativeAudioCapture, NativeCaptureInfo, _capture_candidates
 from app.providers import _bing_lang, _parse_bing_result
 
 
 def test_version():
-    assert __version__ == "beta 0.4"
+    assert __version__ == "beta 0.5"
 
 
 def test_defaults():
@@ -44,6 +49,21 @@ def test_native_loopback_prefers_stereo_wasapi_format():
     assert _capture_candidates(device, True)[0] == (48000, 2)
 
 
+def test_native_capture_waits_for_device_open():
+    capture = NativeAudioCapture(17, True, None, None)
+    capture.info = NativeCaptureInfo(17, "Loopback", 48000, 2)
+    capture._ready_event.set()
+    assert capture.wait_until_ready(timeout=0.01) is capture.info
+
+
+def test_native_capture_reports_device_open_error():
+    capture = NativeAudioCapture(17, True, None, None)
+    capture.error = "device busy"
+    capture._ready_event.set()
+    with pytest.raises(RuntimeError, match="device busy"):
+        capture.wait_until_ready(timeout=0.01)
+
+
 def test_bing_language_mapping():
     assert _bing_lang("auto", source=True) == "auto-detect"
     assert _bing_lang("Chinese") == "zh-Hans"
@@ -53,6 +73,44 @@ def test_bing_language_mapping():
 def test_bing_response_parser():
     payload = {"translations": [{"text": "你好，这是一个测试。", "to": "zh-Hans"}]}
     assert _parse_bing_result(payload) == "你好，这是一个测试。"
+
+
+def test_cuda_archive_uses_windows_tar(monkeypatch, tmp_path):
+    windows_dir = tmp_path / "Windows"
+    tar = windows_dir / "System32" / "tar.exe"
+    tar.parent.mkdir(parents=True)
+    tar.touch()
+    monkeypatch.setattr(install_assets.sys, "platform", "win32")
+    monkeypatch.setenv("WINDIR", str(windows_dir))
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(install_assets.subprocess, "run", fake_run)
+    archive = tmp_path / "runtime.7z"
+    destination = tmp_path / "extracted"
+    install_assets._extract_cuda_archive(archive, destination)
+
+    assert calls[0][0] == [str(tar), "-xf", str(archive), "-C", str(destination)]
+
+
+def test_cuda_archive_extraction_failure_is_reported(monkeypatch, tmp_path):
+    windows_dir = tmp_path / "Windows"
+    tar = windows_dir / "System32" / "tar.exe"
+    tar.parent.mkdir(parents=True)
+    tar.touch()
+    monkeypatch.setattr(install_assets.sys, "platform", "win32")
+    monkeypatch.setenv("WINDIR", str(windows_dir))
+    monkeypatch.setattr(
+        install_assets.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 2, "", "archive error"),
+    )
+
+    with pytest.raises(RuntimeError, match="archive error"):
+        install_assets._extract_cuda_archive(tmp_path / "runtime.7z", tmp_path / "extracted")
 
 
 def test_legacy_asr_migration():

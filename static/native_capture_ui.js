@@ -1,10 +1,10 @@
 (() => {
   const nativeStartTimeoutMs = 7000;
 
-  // beta 0.4: ASR results are rendered immediately; translation updates the
+  // beta 0.5: ASR results are rendered immediately; translation updates the
   // same segment later instead of being required before original text appears.
   const baseHandleWs = handleWs;
-  handleWs = function handleWsBeta04(event) {
+  handleWs = function handleWsBeta05(event) {
     let message = null;
     try { message = JSON.parse(event.data); } catch {}
 
@@ -22,7 +22,7 @@
 
   // Provider-specific modes should not retain stale llama.cpp/OpenAI fields.
   const baseFormConfig = formConfig;
-  formConfig = function formConfigBeta04() {
+  formConfig = function formConfigBeta05() {
     const c = baseFormConfig();
     if (c.asr.mode === 'local_whisper') {
       c.asr.name = 'Local Whisper';
@@ -39,7 +39,7 @@
     return c;
   };
 
-  startNative = async function startNativeBeta04() {
+  startNative = async function startNativeBeta05() {
     const dev = $('nativeDevice').value;
     if (!dev) throw new Error(tr('noAudioDevice'));
 
@@ -54,8 +54,8 @@
       const timeout = setTimeout(() => {
         fail(new Error(
           state.language === 'en'
-            ? 'Windows microphone returned no audio stream. Try another WASAPI device or check Windows exclusive-mode settings.'
-            : 'Windows 原生麦克风未返回音频流。请尝试其他 WASAPI 设备，或检查 Windows 麦克风独占模式设置。'
+            ? 'Windows audio device did not open in time. Try another WASAPI device or check Windows audio settings.'
+            : 'Windows 原生音频设备未能及时打开。请尝试其他 WASAPI 设备，或检查 Windows 音频设置。'
         ));
       }, nativeStartTimeoutMs);
 
@@ -78,12 +78,14 @@
       ws.onmessage = event => {
         let message = null;
         try { message = JSON.parse(event.data); } catch {}
-        handleWs(event);
 
-        if (message?.type === 'level') finish();
         if (message?.type === 'error' && message?.stage !== 'translation') {
           fail(new Error(message.message || tr('failed')));
+          return;
         }
+
+        handleWs(event);
+        if (message?.type === 'ready') finish();
       };
 
       ws.onerror = () => fail(new Error(
@@ -96,25 +98,36 @@
         if (!settled) {
           fail(new Error(
             state.language === 'en'
-              ? 'Windows microphone capture closed before audio was received.'
-              : 'Windows 原生麦克风在收到音频前已关闭。'
+              ? 'Windows audio capture closed before the device became ready.'
+              : 'Windows 原生音频设备就绪前，采集连接已关闭。'
           ));
         }
       };
     });
 
-    ws.onmessage = handleWs;
+    ws.onmessage = event => {
+      let message = null;
+      try { message = JSON.parse(event.data); } catch {}
+      handleWs(event);
+      if (message?.type === 'error' && message?.stage !== 'translation' && state.ws === ws) {
+        state.listening = false;
+        state.ws = null;
+        cleanup();
+        $('micBtn').textContent = tr('startListening');
+        try { ws.close(); } catch {}
+      }
+    };
     ws.onerror = null;
     ws.onclose = null;
   };
 
   const originalToggleFloatingWindow = toggleFloatingWindow;
-  const toggleFloatingWindowBeta04 = async () => {
+  const toggleFloatingWindowBeta05 = async () => {
     await originalToggleFloatingWindow();
     if (floatingWindowIsOpen()) {
-      state.floatingWindow.document.title = 'Academic Live Translator beta 0.4';
+      state.floatingWindow.document.title = 'Academic Live Translator beta 0.5';
     }
   };
-  $('floatingWindowBtn').onclick = toggleFloatingWindowBeta04;
-  $('floatingWindowSettingsBtn').onclick = toggleFloatingWindowBeta04;
+  $('floatingWindowBtn').onclick = toggleFloatingWindowBeta05;
+  $('floatingWindowSettingsBtn').onclick = toggleFloatingWindowBeta05;
 })();

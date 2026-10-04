@@ -199,9 +199,9 @@ def _new_detector_for_session(session_id: str) -> SpeechEndpointDetector:
     except Exception: pass
     return detector
 
-async def _run_pcm_stream(websocket: WebSocket, session_id: str, pcm_source, recorder: SessionAudioRecorder|None=None):
+async def _run_pcm_stream(websocket: WebSocket, session_id: str, pcm_source, recorder: SessionAudioRecorder|None=None, send_ready: bool=True):
     detector=_new_detector_for_session(session_id); send_lock=asyncio.Lock(); tasks:set[asyncio.Task]=set(); sequence=0
-    await websocket.send_json({"type":"ready","session_id":session_id})
+    if send_ready: await websocket.send_json({"type":"ready","session_id":session_id})
     try:
         async for pcm in pcm_source:
             if pcm is None: break
@@ -247,12 +247,23 @@ async def native_ws(websocket: WebSocket):
     try: get_session(session_id); device=int(raw_device)
     except Exception: await websocket.send_json({"type":"error","message":"Invalid session or device"}); await websocket.close(code=1008); return
     cfg=load_config(); recorder=SessionAudioRecorder(session_id,cfg.live.sample_rate,cfg.capture.audio_format) if cfg.capture.save_audio else None; queue:asyncio.Queue=asyncio.Queue(maxsize=32); loop=asyncio.get_running_loop(); capture=NativeAudioCapture(device,source=="native_system",loop,queue); capture.start()
+    try:
+        await asyncio.to_thread(capture.wait_until_ready, 5.0)
+    except Exception as exc:
+        capture.stop()
+        await websocket.send_json({"type":"error","stage":"capture","message":str(exc)})
+        await websocket.close(code=1011)
+        return
+    await websocket.send_json({"type":"ready","session_id":session_id})
     async def native_source():
         while True:
             pcm=await queue.get()
-            if pcm==b"" and capture.error: raise RuntimeError(capture.error)
+            if pcm==b"" and capture.error:
+                await websocket.send_json({"type":"error","stage":"capture","message":capture.error})
+                yield None
+                return
             yield pcm
-    task=asyncio.create_task(_run_pcm_stream(websocket,session_id,native_source(),recorder))
+    task=asyncio.create_task(_run_pcm_stream(websocket,session_id,native_source(),recorder,send_ready=False))
     try:
         while True:
             message=await websocket.receive()

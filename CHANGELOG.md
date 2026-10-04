@@ -1,5 +1,17 @@
 # Changelog
 
+## beta 0.5 — 2026-10-04
+
+Whisper/Bing live-path and Windows microphone/configuration reliability beta.
+
+- Prevented settings and live-capture actions from using the WebUI before its configuration has finished loading; concurrent early actions now share the same initialization request.
+- Native Windows capture now confirms the WASAPI device opened instead of waiting for the first audio frame, so a quiet input no longer produces a false startup failure; device-open errors are reported immediately.
+- Fixed Windows CUDA runtime extraction: the bundled 7z archive uses BCJ2, which `py7zr` does not support, so Windows now extracts it with the built-in `tar.exe`.
+- The installer now checks dependency and asset-install exit codes, verifies its completion marker, and stops instead of launching after a failed setup.
+- CUDA installation is not marked complete unless the real Whisper CUDA inference self-test succeeds.
+- The app registers the project-local CUDA DLL directory itself, so manually launched WebUI processes can use the portable runtime too.
+- Bumped the WebUI, API, and install marker to beta 0.5.
+
 ## beta 0.4 — 2026-10-04
 
 Local Whisper / Bing reliability and one-click portable installation beta.

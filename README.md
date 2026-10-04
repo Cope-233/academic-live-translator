@@ -2,15 +2,17 @@
 
 **简体中文** | [English](./README.en.md)
 
-**beta 0.4 · WebUI · 默认便携模式**
+**beta 0.5 · WebUI · 默认便携模式**
 
 Academic Live Translator 是一个本地优先的实时语音转录、翻译与学术记录 WebUI，适用于课堂、研讨会、学术会议、日常会议、访谈以及已有音视频材料。
 
 > Beta 阶段统一使用 `beta x.y` 作为版本标识；首个稳定版本发布后再开始使用正式语义化版本号。
 
-## beta 0.4：Whisper / Bing 修复与一键安装
+## beta 0.5：Whisper / Bing 与 Windows 安装修复
 
-beta 0.4 重点解决 Local Faster-Whisper 与 Bing Free 在实时工作区中的可靠性问题，并加入面向普通用户的 Windows 一键安装机制。
+beta 0.5 修复了 beta 0.4 Windows CUDA runtime 安装失败、Whisper 自动选择 CUDA 后无法推理，以及设置初始化时过早点击测试/监听会报错的问题。实时 Whisper 原文优先显示与 Bing 返回值解析也经过了真实 provider 和浏览器音频链路验证。
+
+Windows 运行时安装改用系统自带的 `tar.exe` 解压 CUDA bundle，避免 `py7zr` 不支持该压缩包使用的 BCJ2 filter；安装器会验证每一步的退出码和真实 CUDA 推理结果，安装失败时不会启动 WebUI，也不会留下“已完成”的标记。应用启动时会自动注册项目内 CUDA DLL 目录。WASAPI 麦克风与系统音频在设备成功打开后即进入监听；静音时不会再被误判为采集失败。
 
 ### 实时链路修复
 
@@ -52,7 +54,7 @@ install.bat
 start_webui.bat
 ```
 
-如果 beta 0.4 尚未完成初始化，`start_webui.bat` 会自动执行完整安装，然后启动 WebUI。
+如果 beta 0.5 尚未完成初始化，`start_webui.bat` 会自动执行完整安装，然后启动 WebUI。
 
 安装脚本会自动：
 
@@ -148,7 +150,7 @@ academic-live-translator/
 
 ### ASR：Local Faster-Whisper
 
-默认模型为 `base`。beta 0.4 完整安装会提前准备全部五个模型，之后切换模型无需重新下载。
+默认模型为 `base`。beta 0.5 完整安装会提前准备全部五个模型，之后切换模型无需重新下载。
 
 CPU 模式不需要 CUDA。Windows NVIDIA 用户通过一键安装获得项目目录内的 CUDA Runtime，推荐使用启动脚本运行，以便把 `runtime/cuda12/bin` 只加入当前应用进程的 DLL 搜索路径。
 
@@ -189,13 +191,13 @@ chmod +x start_webui.sh
 ./start_webui.sh
 ```
 
-Linux/macOS 支持浏览器麦克风、标签页/屏幕音频以及媒体文件工作流；Windows WASAPI 捕获和 beta 0.4 的 Windows CUDA bundle 不适用。GPU Runtime 需要按对应平台自行准备。
+Linux/macOS 支持浏览器麦克风、标签页/屏幕音频以及媒体文件工作流；Windows WASAPI 捕获和 Windows CUDA bundle 不适用。GPU Runtime 需要按对应平台自行准备。
 
 ## 从旧版升级
 
-beta 0.4 继续使用 Portable-by-default 存储。已有 `data/config.json` 与 Session 可以继续使用。
+beta 0.5 继续使用 Portable-by-default 存储。已有 `data/config.json` 与 Session 可以继续使用。
 
-首次运行 beta 0.4 时，启动脚本会检测 `data/.installed-beta-0.4`；如果不存在，会执行新的完整安装流程。旧版已经下载的 Hugging Face 模型缓存不会删除，但 beta 0.4 会为五种模型建立清晰的项目内模型目录。
+首次运行 beta 0.5 时，启动脚本会检测 `data/.installed-beta-0.5`；如果不存在，会执行完整安装流程。旧版已经下载的 Hugging Face 模型缓存不会删除；五种模型与 CUDA runtime 保存在项目目录中。
 
 ## 开发
 

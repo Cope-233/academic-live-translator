@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
+import os
 import re
+import sys
 import threading
 
 import httpx
 
-from .config import MODELS_DIR
+from .config import MODELS_DIR, PROJECT_ROOT
 from .models import AcademicConfig, ProviderConfig
 
 _ASR_PREFIX_RE = re.compile(r"^\s*language\s+[^<\r\n]+<asr_text>\s*", re.IGNORECASE)
@@ -17,6 +19,27 @@ _HTTP_CLIENT: httpx.AsyncClient | None = None
 _WHISPER_MODELS: dict[tuple[str, str, str], object] = {}
 _WHISPER_LOCK = threading.Lock()
 _WHISPER_INFER_LOCK = threading.Lock()
+_CUDA_DLL_HANDLE = None
+
+
+def _enable_project_cuda_runtime() -> None:
+    global _CUDA_DLL_HANDLE
+    if sys.platform != "win32":
+        return
+    runtime_dir = PROJECT_ROOT / "runtime" / "cuda12" / "bin"
+    if not runtime_dir.is_dir():
+        return
+    runtime_path = str(runtime_dir)
+    os.environ["PATH"] = runtime_path + os.pathsep + os.environ.get("PATH", "")
+    add_dll_directory = getattr(os, "add_dll_directory", None)
+    if add_dll_directory:
+        try:
+            _CUDA_DLL_HANDLE = add_dll_directory(runtime_path)
+        except OSError:
+            _CUDA_DLL_HANDLE = None
+
+
+_enable_project_cuda_runtime()
 
 LANG_CODES = {"auto":"auto","english":"en","en":"en","chinese":"zh","中文":"zh","zh":"zh","malay":"ms","ms":"ms","japanese":"ja","ja":"ja","korean":"ko","ko":"ko","french":"fr","fr":"fr","german":"de","de":"de","spanish":"es","es":"es","italian":"it","it":"it","portuguese":"pt","pt":"pt","russian":"ru","ru":"ru","arabic":"ar","ar":"ar","thai":"th","th":"th","vietnamese":"vi","vi":"vi","indonesian":"id","id":"id","hindi":"hi","hi":"hi"}
 
