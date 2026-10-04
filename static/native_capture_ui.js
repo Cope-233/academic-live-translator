@@ -1,7 +1,45 @@
 (() => {
   const nativeStartTimeoutMs = 7000;
 
-  startNative = async function startNativeBeta03() {
+  // beta 0.4: ASR results are rendered immediately; translation updates the
+  // same segment later instead of being required before original text appears.
+  const baseHandleWs = handleWs;
+  handleWs = function handleWsBeta04(event) {
+    let message = null;
+    try { message = JSON.parse(event.data); } catch {}
+
+    if (message?.type === 'segment_update' && state.session) {
+      const updated = message.segment;
+      const index = state.session.segments.findIndex(seg => seg.id === updated?.id);
+      if (index >= 0) state.session.segments[index] = updated;
+      else if (updated) state.session.segments.push(updated);
+      renderSession();
+      return;
+    }
+
+    baseHandleWs(event);
+  };
+
+  // Provider-specific modes should not retain stale llama.cpp/OpenAI fields.
+  const baseFormConfig = formConfig;
+  formConfig = function formConfigBeta04() {
+    const c = baseFormConfig();
+    if (c.asr.mode === 'local_whisper') {
+      c.asr.name = 'Local Whisper';
+      c.asr.base_url = '';
+      c.asr.api_key = '';
+      c.asr.endpoint = null;
+    }
+    if (c.translation.mode === 'bing_web') {
+      c.translation.name = 'Bing Translate (Free)';
+      c.translation.base_url = '';
+      c.translation.api_key = '';
+      c.translation.endpoint = null;
+    }
+    return c;
+  };
+
+  startNative = async function startNativeBeta04() {
     const dev = $('nativeDevice').value;
     if (!dev) throw new Error(tr('noAudioDevice'));
 
@@ -43,7 +81,9 @@
         handleWs(event);
 
         if (message?.type === 'level') finish();
-        if (message?.type === 'error') fail(new Error(message.message || tr('failed')));
+        if (message?.type === 'error' && message?.stage !== 'translation') {
+          fail(new Error(message.message || tr('failed')));
+        }
       };
 
       ws.onerror = () => fail(new Error(
@@ -69,12 +109,12 @@
   };
 
   const originalToggleFloatingWindow = toggleFloatingWindow;
-  const toggleFloatingWindowBeta03 = async () => {
+  const toggleFloatingWindowBeta04 = async () => {
     await originalToggleFloatingWindow();
     if (floatingWindowIsOpen()) {
-      state.floatingWindow.document.title = 'Academic Live Translator beta 0.3';
+      state.floatingWindow.document.title = 'Academic Live Translator beta 0.4';
     }
   };
-  $('floatingWindowBtn').onclick = toggleFloatingWindowBeta03;
-  $('floatingWindowSettingsBtn').onclick = toggleFloatingWindowBeta03;
+  $('floatingWindowBtn').onclick = toggleFloatingWindowBeta04;
+  $('floatingWindowSettingsBtn').onclick = toggleFloatingWindowBeta04;
 })();
