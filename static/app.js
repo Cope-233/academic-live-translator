@@ -11,7 +11,9 @@ const state = {
   processor: null,
   listening: false,
   devices: {supported:false, system:[], microphones:[]},
-  language: 'zh-CN'
+  language: 'zh-CN',
+  autoFollow: true,
+  programmaticScroll: false
 };
 
 const I18N = {
@@ -21,7 +23,7 @@ const I18N = {
     mediaTitle:'媒体工作区', mediaSubtitle:'处理已有音频和视频。', libraryTitle:'学术资料库', librarySubtitle:'搜索、打开或删除历史会话。',
     settingsTitle:'设置', settingsSubtitle:'配置界面语言、本地模型或 OpenAI-compatible 服务。',
     audioSource:'音频来源', browserMicrophone:'浏览器麦克风', browserSystem:'浏览器标签页 / 屏幕音频', browserMix:'浏览器系统音频 + 麦克风', windowsSystem:'Windows 系统音频 (WASAPI)', windowsMic:'Windows 原生麦克风', device:'设备',
-    source:'源语言', target:'目标语言', auto:'自动', startListening:'开始监听', stopListening:'停止监听', original:'原文', idle:'空闲', listening:'监听中', translating:'翻译中…', stopped:'已停止', waitingAudio:'等待音频输入…', translationHere:'译文将在这里出现…',
+    source:'源语言', target:'目标语言', auto:'自动', startListening:'开始监听', stopListening:'停止监听', original:'原文', waitingAudio:'等待音频输入…', translationHere:'译文将在这里出现…',
     academicNotes:'学术笔记', notePlaceholder:'研究想法、追问、待办…', note:'📝 笔记', important:'⭐ 重点', question:'❓ 问题', idea:'💡 想法', reference:'📚 文献', followUp:'⚠ 待跟进', saveNote:'保存笔记',
     mediaTranscription:'媒体转录', mediaDesc:'音频 / 视频 → ASR → 翻译 → 带时间戳会话。', sessionTitlePlaceholder:'会话标题', processMedia:'处理媒体', searchPlaceholder:'搜索转录、翻译或笔记', refresh:'刷新',
     interface:'界面', language:'语言', languageHint:'界面语言会立即切换并自动保存。', type:'类型', name:'名称',
@@ -36,7 +38,7 @@ const I18N = {
     mediaTitle:'Media Workspace', mediaSubtitle:'Process existing audio and video.', libraryTitle:'Academic Library', librarySubtitle:'Search, open or delete previous sessions.',
     settingsTitle:'Settings', settingsSubtitle:'Configure interface language, local models or OpenAI-compatible services.',
     audioSource:'Audio source', browserMicrophone:'Browser microphone', browserSystem:'Browser tab / screen audio', browserMix:'Browser system + microphone', windowsSystem:'Windows system audio (WASAPI)', windowsMic:'Windows native microphone', device:'Device',
-    source:'Source', target:'Target', auto:'Auto', startListening:'Start listening', stopListening:'Stop listening', original:'Original', idle:'Idle', listening:'Listening', translating:'Translating…', stopped:'Stopped', waitingAudio:'Waiting for audio input…', translationHere:'Translation will appear here…',
+    source:'Source', target:'Target', auto:'Auto', startListening:'Start listening', stopListening:'Stop listening', original:'Original', waitingAudio:'Waiting for audio input…', translationHere:'Translation will appear here…',
     academicNotes:'Academic Notes', notePlaceholder:'Research ideas, questions, follow-ups…', note:'📝 Note', important:'⭐ Important', question:'❓ Question', idea:'💡 Idea', reference:'📚 Reference', followUp:'⚠ Follow up', saveNote:'Save note',
     mediaTranscription:'Media transcription', mediaDesc:'Audio / video → ASR → translation → timestamped session.', sessionTitlePlaceholder:'Session title', processMedia:'Process media', searchPlaceholder:'Search transcript, translation or notes', refresh:'Refresh',
     interface:'Interface', language:'Language', languageHint:'The interface language changes immediately and is saved automatically.', type:'Type', name:'Name',
@@ -59,7 +61,6 @@ function applyLanguage(language){
   updateViewHeading(active);
   if(!state.session && $('sessionTitle')) $('sessionTitle').value = tr('noSession');
   if($('micBtn')) $('micBtn').textContent = state.listening ? tr('stopListening') : tr('startListening');
-  if($('asrStatus') && !state.listening) $('asrStatus').textContent = tr('idle');
 }
 
 function toast(t){
@@ -217,22 +218,81 @@ $('audioSource').onchange=updateDeviceUI;
 
 async function createSession(){
   state.session=await api('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'live',input_source:$('audioSource').value})});
-  renderSession(); return state.session;
+  state.autoFollow=true;
+  renderSession({forceLatest:true});
+  return state.session;
 }
 $('newSessionBtn').onclick=()=>createSession().catch(e=>toast(e.message));
 
 function esc(x=''){ const d=document.createElement('div'); d.textContent=x; return d.innerHTML; }
 
-function renderSession(){
+function isNearBottom(el, threshold=56){
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+}
+
+function pairedScrollTop(source,target){
+  const sourceSegments=[...source.querySelectorAll('.segment')];
+  const targetSegments=[...target.querySelectorAll('.segment')];
+  if(!sourceSegments.length || sourceSegments.length!==targetSegments.length){
+    const sourceMax=Math.max(1,source.scrollHeight-source.clientHeight);
+    const targetMax=Math.max(0,target.scrollHeight-target.clientHeight);
+    return (source.scrollTop/sourceMax)*targetMax;
+  }
+  const sourceTop=source.getBoundingClientRect().top;
+  let index=sourceSegments.findIndex(seg=>seg.getBoundingClientRect().bottom>sourceTop+1);
+  if(index<0) index=sourceSegments.length-1;
+  const sourceRect=sourceSegments[index].getBoundingClientRect();
+  const progress=Math.max(0,Math.min(1,(sourceTop-sourceRect.top)/Math.max(sourceRect.height,1)));
+  const targetRect=targetSegments[index].getBoundingClientRect();
+  const targetTop=target.getBoundingClientRect().top;
+  return target.scrollTop+(targetRect.top-targetTop)+(progress*targetRect.height);
+}
+
+function syncTranscriptScroll(source,target){
+  if(state.programmaticScroll) return;
+  state.autoFollow=isNearBottom(source);
+  state.programmaticScroll=true;
+  target.scrollTop=pairedScrollTop(source,target);
+  requestAnimationFrame(()=>{state.programmaticScroll=false;});
+}
+
+function setupTranscriptScrollSync(){
+  const original=$('originalList'),translation=$('translationList');
+  original.addEventListener('scroll',()=>syncTranscriptScroll(original,translation),{passive:true});
+  translation.addEventListener('scroll',()=>syncTranscriptScroll(translation,original),{passive:true});
+}
+
+function restoreOrFollowScroll(previous,forceLatest=false){
+  const original=$('originalList'),translation=$('translationList');
+  requestAnimationFrame(()=>{
+    state.programmaticScroll=true;
+    if(forceLatest || state.autoFollow){
+      original.scrollTop=original.scrollHeight;
+      translation.scrollTop=translation.scrollHeight;
+      state.autoFollow=true;
+    }else{
+      original.scrollTop=previous.original;
+      translation.scrollTop=previous.translation;
+    }
+    requestAnimationFrame(()=>{state.programmaticScroll=false;});
+  });
+}
+
+function renderSession({forceLatest=false}={}){
   const s=state.session;if(!s)return;
   $('sessionTitle').value=s.title;$('sessionTitle').disabled=false;
-  const o=$('originalList'),t=$('translationList');o.classList.remove('empty');t.classList.remove('empty');
-  o.innerHTML=s.segments.length?'':tr('waitingAudio'); t.innerHTML=s.segments.length?'':tr('translationHere');
+  const o=$('originalList'),t=$('translationList');
+  const previous={original:o.scrollTop,translation:t.scrollTop};
+  o.classList.remove('empty');t.classList.remove('empty');
+  o.innerHTML=s.segments.length?'':tr('waitingAudio');
+  t.innerHTML=s.segments.length?'':tr('translationHere');
   for(const seg of s.segments){
-    o.insertAdjacentHTML('beforeend',`<div class="segment"><small>${fmt(seg.start_ms)}</small>${esc(seg.source)}</div>`);
-    t.insertAdjacentHTML('beforeend',`<div class="segment"><small>${fmt(seg.start_ms)}</small>${esc(seg.translation)}</div>`);
+    const sid=esc(seg.id||'');
+    o.insertAdjacentHTML('beforeend',`<div class="segment" data-segment-id="${sid}"><small>${fmt(seg.start_ms)}</small>${esc(seg.source)}</div>`);
+    t.insertAdjacentHTML('beforeend',`<div class="segment" data-segment-id="${sid}"><small>${fmt(seg.start_ms)}</small>${esc(seg.translation)}</div>`);
   }
   renderNotes();
+  restoreOrFollowScroll(previous,forceLatest);
 }
 
 function renderNotes(){
@@ -250,8 +310,10 @@ async function syncLive(){
 
 function handleWs(e){
   let x;try{x=JSON.parse(e.data)}catch{return}
-  if(x.type==='transcript') $('asrStatus').textContent=tr('translating');
-  if(x.type==='segment'){ state.session.segments.push(x.segment); renderSession(); $('asrStatus').textContent=tr('listening'); }
+  if(x.type==='segment'){
+    state.session.segments.push(x.segment);
+    renderSession();
+  }
   if(x.type==='error') toast(x.message);
 }
 
@@ -287,7 +349,7 @@ async function startListening(){
   try{
     if(!state.session)await createSession();await syncLive();const src=$('audioSource').value;
     if(src.startsWith('native_'))await startNative();else await startBrowser();
-    state.listening=true;$('micBtn').textContent=tr('stopListening');$('asrStatus').textContent=tr('listening');
+    state.listening=true;$('micBtn').textContent=tr('stopListening');
   }catch(e){toast(e.message);cleanup()}
 }
 
@@ -300,7 +362,7 @@ function cleanup(){
 
 async function stopListening(){
   state.listening=false;try{state.ws?.send(JSON.stringify({type:'stop'}))}catch{}cleanup();
-  $('micBtn').textContent=tr('startListening');$('asrStatus').textContent=tr('stopped');setTimeout(refreshSession,700);
+  $('micBtn').textContent=tr('startListening');setTimeout(refreshSession,700);
 }
 $('micBtn').onclick=()=>state.listening?stopListening():startListening();
 
@@ -317,7 +379,12 @@ async function loadSessions(){
   const items=await api('/api/sessions?q='+encodeURIComponent($('sessionSearch').value.trim()));
   $('sessionList').innerHTML=items.length?items.map(s=>`<div class="session" data-id="${s.id}"><div><strong>${esc(s.title)}</strong><p>${s.segments} ${tr('segments')} · ${s.annotations} ${tr('notes')} · ${s.source_language} → ${s.target_language}</p></div><div><button class="open">${tr('open')}</button> <button class="danger delete">${tr('delete')}</button></div></div>`).join(''):`<div class="pad muted">${tr('noSessions')}</div>`;
   q('.session').forEach(el=>{
-    el.querySelector('.open').onclick=async()=>{state.session=await api('/api/sessions/'+el.dataset.id);renderSession();switchView('live')};
+    el.querySelector('.open').onclick=async()=>{
+      state.session=await api('/api/sessions/'+el.dataset.id);
+      state.autoFollow=true;
+      renderSession({forceLatest:true});
+      switchView('live');
+    };
     el.querySelector('.delete').onclick=async()=>{if(confirm(tr('deleteConfirm'))){await api('/api/sessions/'+el.dataset.id,{method:'DELETE'});loadSessions()}};
   });
 }
@@ -329,10 +396,14 @@ $('processFileBtn').onclick=async()=>{
   $('mediaStatus').textContent=tr('processing');const fd=new FormData();fd.append('file',f);
   try{
     state.session=await api('/api/process-file?title='+encodeURIComponent($('mediaTitle').value.trim()),{method:'POST',body:fd});
-    $('mediaStatus').textContent=`${tr('done')}: ${state.session.segments.length} ${tr('segments')}`;renderSession();switchView('live');
+    state.autoFollow=true;
+    $('mediaStatus').textContent=`${tr('done')}: ${state.session.segments.length} ${tr('segments')}`;
+    renderSession({forceLatest:true});switchView('live');
   }catch(e){$('mediaStatus').textContent=e.message}
 };
 
 $('sessionTitle').onchange=async()=>{if(state.session)state.session=await api('/api/sessions/'+state.session.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:$('sessionTitle').value})})};
+
+setupTranscriptScrollSync();
 
 (async()=>{try{await loadConfig();await loadDevices();await loadSessions()}catch(e){toast(tr('startupError')+': '+e.message)}})();
