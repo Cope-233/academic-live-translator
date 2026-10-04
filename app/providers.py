@@ -63,6 +63,10 @@ def _whisper_device(cfg: ProviderConfig) -> tuple[str,str]:
         compute = "float16" if device == "cuda" else "int8"
     return device, compute
 
+def _local_whisper_path(model_name: str):
+    direct = MODELS_DIR / "faster-whisper" / model_name
+    return direct if (direct / "model.bin").exists() else None
+
 def get_local_whisper(cfg: ProviderConfig):
     from faster_whisper import WhisperModel
     device, compute = _whisper_device(cfg)
@@ -70,18 +74,27 @@ def get_local_whisper(cfg: ProviderConfig):
     with _WHISPER_LOCK:
         if key in _WHISPER_MODELS:
             return _WHISPER_MODELS[key]
+        local_path = _local_whisper_path(cfg.model)
+        model_ref = str(local_path) if local_path else cfg.model
+        kwargs = {"device":device,"compute_type":compute}
+        if local_path is None:
+            kwargs["download_root"] = str(MODELS_DIR / "faster-whisper")
         try:
-            model = WhisperModel(cfg.model, device=device, compute_type=compute, download_root=str(MODELS_DIR / "faster-whisper"))
+            model = WhisperModel(model_ref, **kwargs)
         except Exception:
             if device == "cpu":
                 raise
-            model = WhisperModel(cfg.model, device="cpu", compute_type="int8", download_root=str(MODELS_DIR / "faster-whisper"))
+            fallback = {"device":"cpu","compute_type":"int8"}
+            if local_path is None:
+                fallback["download_root"] = str(MODELS_DIR / "faster-whisper")
+            model = WhisperModel(model_ref, **fallback)
         _WHISPER_MODELS[key] = model
         return model
 
 def prepare_local_whisper(cfg: ProviderConfig) -> dict:
     model = get_local_whisper(cfg)
-    return {"ok":True,"model":cfg.model,"detail":f"Local Whisper '{cfg.model}' ready","runtime":type(model).__name__}
+    device, compute = _whisper_device(cfg)
+    return {"ok":True,"model":cfg.model,"detail":f"Local Whisper '{cfg.model}' ready","runtime":type(model).__name__,"device":device,"compute_type":compute}
 
 def _wav_to_float32(wav_bytes: bytes):
     import numpy as np, wave
@@ -132,13 +145,55 @@ def _protect_academic_terms(text: str, academic: AcademicConfig) -> str:
         text = re.sub(re.escape(src),dst,text,flags=re.IGNORECASE)
     return text
 
+def _bing_lang(value: str | None, *, source: bool=False) -> str:
+    code = lang_code(value, "auto" if source else "zh")
+    if source and code == "auto":
+        return "auto-detect"
+    if code in {"zh","zh-cn","zh-hans"}:
+        return "zh-Hans"
+    if code in {"zh-tw","zh-hant"}:
+        return "zh-Hant"
+    return code
+
+def _parse_bing_result(result) -> str:
+    if not isinstance(result, dict):
+        raise RuntimeError(f"Unexpected Bing response: {result!r}")
+    if result.get("statusCode"):
+        raise RuntimeError(str(result.get("errorMessage") or f"Bing returned status {result['statusCode']}"))
+    translations = result.get("translations") or []
+    if not translations or not isinstance(translations[0], dict):
+        raise RuntimeError(f"Bing returned no translation: {result!r}")
+    text = translations[0].get("text")
+    if not text:
+        raise RuntimeError(f"Bing returned an empty translation: {result!r}")
+    return str(text).strip()
+
+async def _translate_bing(text: str, target_language: str, academic: AcademicConfig) -> str:
+    from mintrans import BingTranslator
+    result = await asyncio.to_thread(
+        BingTranslator().translate,
+        _protect_academic_terms(text,academic),
+        _bing_lang(academic.source_language, source=True),
+        _bing_lang(target_language),
+    )
+    return _parse_bing_result(result)
+
 async def test_provider(cfg: ProviderConfig, academic: AcademicConfig|None=None) -> dict:
+    academic = academic or AcademicConfig()
     if cfg.mode == "local_whisper":
-        return await asyncio.to_thread(prepare_local_whisper,cfg)
+        try:
+            import numpy as np
+            model = get_local_whisper(cfg)
+            with _WHISPER_INFER_LOCK:
+                segments, _ = model.transcribe(np.zeros(16000,dtype=np.float32),beam_size=1,best_of=1,temperature=0.0,condition_on_previous_text=False,vad_filter=False)
+                list(segments)
+            device, compute = _whisper_device(cfg)
+            return {"ok":True,"model":cfg.model,"detail":f"Local Whisper inference ready on {device}/{compute}","runtime":type(model).__name__}
+        except Exception as exc:
+            return {"ok":False,"model":cfg.model,"error":str(exc)}
     if cfg.mode == "bing_web":
         try:
-            from mintrans import BingTranslator
-            translated = await asyncio.to_thread(BingTranslator().translate,"Hello","en","zh")
+            translated = await _translate_bing("Hello", "Chinese", academic)
             return {"ok":True,"url":"Bing web","models":["bing"],"detail":translated}
         except Exception as exc:
             return {"ok":False,"url":"Bing web","error":str(exc)}
@@ -175,10 +230,6 @@ def build_translation_prompt(text: str, academic: AcademicConfig, target_languag
     context = [x.strip() for x in (context or []) if x and x.strip()]
     context_block = "Previous context (do not translate this block):\n"+"\n".join(context)+"\n\n" if context else ""
     return academic.translation_prompt.format(target_language=target,glossary_block=glossary_block,context_block=context_block,text=text)
-
-async def _translate_bing(text: str, target_language: str, academic: AcademicConfig) -> str:
-    from mintrans import BingTranslator
-    return str(await asyncio.to_thread(BingTranslator().translate,_protect_academic_terms(text,academic),lang_code(academic.source_language),lang_code(target_language,"zh"))).strip()
 
 async def _translate_azure(text: str, cfg: ProviderConfig, target_language: str) -> str:
     params={"api-version":"3.0","to":lang_code(target_language,"zh")}; headers={"Ocp-Apim-Subscription-Key":cfg.api_key,"Content-Type":"application/json"}
