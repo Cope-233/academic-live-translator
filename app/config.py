@@ -45,7 +45,7 @@ CONFIG_PATH = DATA_DIR / "config.json"
 
 
 def _migrate_config(raw: dict) -> dict:
-    """Normalize older beta01 config values without breaking portable installs."""
+    """Normalize older beta config values without breaking portable installs."""
     asr = raw.get("asr")
     if isinstance(asr, dict) and asr.get("mode") in {"openai_transcriptions", "openai_chat_audio"}:
         asr["mode"] = "openai_chat"
