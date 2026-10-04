@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import BaseModel, Field
 
-ProviderMode = Literal["local_whisper","openai_transcriptions","openai_chat_audio","openai_chat","bing_web","azure_translator"]
+ProviderMode = Literal["local_whisper","openai_chat","bing_web","azure_translator"]
 SessionMode = Literal["live","media","lecture","meeting"]
 InputSource = Literal["microphone","browser_system","browser_mix","native_system","native_microphone","media_file"]
 MarkerKind = Literal["important","question","idea","reference","follow_up","note"]
@@ -40,6 +40,9 @@ class CaptureConfig(BaseModel):
     system_gain: float = Field(default=1.0, ge=0.0, le=2.0)
     microphone_gain: float = Field(default=0.85, ge=0.0, le=2.0)
 
+class InterfaceConfig(BaseModel):
+    language: Literal["zh-CN","en"] = "zh-CN"
+
 class AcademicConfig(BaseModel):
     source_language: str = "auto"
     target_language: str = "Chinese"
@@ -56,6 +59,7 @@ class AcademicConfig(BaseModel):
     translation_prompt: str = "Translate the CURRENT text into {target_language}. Preserve academic terminology, proper nouns, abbreviations, numbers, and citations. Use the context only to resolve references and terminology. Output only the translation of CURRENT.\n\n{glossary_block}{context_block}CURRENT:\n{text}"
 
 class AppConfig(BaseModel):
+    interface: InterfaceConfig = InterfaceConfig()
     asr: ProviderConfig = ProviderConfig(name="Local Whisper",mode="local_whisper",model="base",device="auto",compute_type="auto")
     translation: ProviderConfig = ProviderConfig(name="Bing Translate (Free)",mode="bing_web",model="bing",temperature=0.0)
     live: LiveConfig = LiveConfig()
