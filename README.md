@@ -2,7 +2,7 @@
 
 **简体中文** | [English](./README.en.md)
 
-**beta 0.5 · WebUI · 默认便携模式**
+** WebUI · Portable安装模式**
 
 Academic Live Translator 是一个本地优先的实时语音转录、翻译与学术记录 WebUI，适用于课堂、研讨会、学术会议、日常会议、访谈以及已有音视频材料。
 
