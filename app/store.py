@@ -23,6 +23,12 @@ def list_sessions(query=''):
         except Exception: pass
     return sorted(items,key=lambda x:x.updated_at,reverse=True)
 def append_segment(session_id,segment): s=get_session(session_id); s.segments.append(segment); s.segments.sort(key=lambda x:(x.start_ms,x.end_ms,x.id)); save_session(s); return s
+def update_segment(session_id,segment):
+    s=get_session(session_id)
+    for i,current in enumerate(s.segments):
+        if current.id==segment.id:
+            s.segments[i]=segment; s.segments.sort(key=lambda x:(x.start_ms,x.end_ms,x.id)); save_session(s); return s
+    s.segments.append(segment); s.segments.sort(key=lambda x:(x.start_ms,x.end_ms,x.id)); save_session(s); return s
 def set_bookmark(session_id,segment_id,bookmarked):
     s=get_session(session_id)
     for seg in s.segments:
