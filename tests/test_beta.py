@@ -2,10 +2,11 @@ from app import __version__
 from app.models import AppConfig
 from app.config import CACHE_DIR, DATA_DIR, MODELS_DIR, PROJECT_ROOT, _migrate_config
 from app.native_capture import _capture_candidates
+from app.providers import _bing_lang, _parse_bing_result
 
 
 def test_version():
-    assert __version__ == "beta 0.3"
+    assert __version__ == "beta 0.4"
 
 
 def test_defaults():
@@ -41,6 +42,17 @@ def test_native_microphone_prefers_mono_wasapi_format():
 def test_native_loopback_prefers_stereo_wasapi_format():
     device = {"defaultSampleRate": 48000, "maxInputChannels": 2}
     assert _capture_candidates(device, True)[0] == (48000, 2)
+
+
+def test_bing_language_mapping():
+    assert _bing_lang("auto", source=True) == "auto-detect"
+    assert _bing_lang("Chinese") == "zh-Hans"
+    assert _bing_lang("zh-tw") == "zh-Hant"
+
+
+def test_bing_response_parser():
+    payload = {"translations": [{"text": "你好，这是一个测试。", "to": "zh-Hans"}]}
+    assert _parse_bing_result(payload) == "你好，这是一个测试。"
 
 
 def test_legacy_asr_migration():
