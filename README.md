@@ -2,15 +2,15 @@
 
 [简体中文](./README.md) | [English](./README.en.md)
 
-**beta01 · WebUI · 默认便携模式**
+**beta 0.1 · WebUI · 默认便携模式**
 
 Academic Live Translator 是一个本地优先的 WebUI，用于实时语音转录、翻译与学术场景记录。它面向课堂、研讨会、学术会议、日常会议、访谈以及已有音视频材料等使用场景。
 
-> 本项目目前处于 Beta 阶段。预发布版本统一使用 `betaXX` 作为版本标识；首个稳定版本发布后再开始使用正式的语义化版本号。
+> 本项目目前处于 Beta 阶段。测试阶段使用 `beta x.y` 版本标识；首个稳定版本发布后再开始使用正式的语义化版本号。
 
 ## 主要功能
 
-- 实时双语转录工作区
+- 实时双语转录工作区，原文与译文支持同步滚动并自动跟随最新记录
 - WebUI 默认中文，可在 Settings 中切换中文 / English
 - 支持浏览器麦克风、浏览器标签页/屏幕音频、Windows WASAPI 系统音频回环以及音视频文件输入
 - 学术术语表 Profile 与自定义术语
@@ -111,7 +111,7 @@ Model: <translation model id>
 Mode: OpenAI Chat Completions
 ```
 
-远程 ASR 通过 Chat Completions 的 `input_audio` 发送音频。因此所接入的 OpenAI-compatible 服务需要支持多模态音频输入。
+远程 ASR 通过 Chat Completions 的 `input_audio` 发送音频，因此所接入的 OpenAI-compatible 服务需要支持多模态音频输入。
 
 ## 实时音频输入
 
@@ -136,7 +136,8 @@ WebUI 默认使用中文，可在 `Settings → 界面 → 语言` 中切换为 
 
 在实时 Session 中，你可以：
 
-- 同时查看原始转录与翻译；
+- 同时查看原始转录与翻译，并同步滚动两侧记录；
+- 默认自动滚动至最新记录；手动向上查看历史内容时会暂时停止自动跟随，回到底部后自动恢复；
 - 使用学术术语 Profile 或自定义术语；
 - 将内容标记为 Important、Question、Idea、Reference、Follow-up 或 Note；
 - 截取当前屏幕并作为课程/PPT快照保存；
@@ -145,9 +146,9 @@ WebUI 默认使用中文，可在 `Settings → 界面 → 语言` 中切换为 
 
 ## 从旧版迁移
 
-`beta01` **不会自动复用** v0.1 / v0.2 / v0.3 曾经位于 AppData 中的数据目录。这样可以避免不同版本之间意外共享 Session，同时避免应用数据隐藏占用系统盘。
+`beta 0.1` **不会自动复用** v0.1 / v0.2 / v0.3 曾经位于 AppData 中的数据目录。这样可以避免不同版本之间意外共享 Session，同时避免应用数据隐藏占用系统盘。
 
-现有 beta01 中使用旧 ASR 模式名称的配置会自动迁移到统一的 `OpenAI Chat Completions` 模式；旧的 Malay 目标语言会回退为中文。
+旧 beta 配置中使用早期 ASR 模式名称的设置会自动迁移到统一的 `OpenAI Chat Completions` 模式；旧的 Malay 目标语言会回退为中文。
 
 ## 开发
 
