@@ -2,15 +2,15 @@
 
 [简体中文](./README.md) | **English**
 
-**beta01 · WebUI · portable by default**
+**beta 0.1 · WebUI · portable by default**
 
 Academic Live Translator is a local-first WebUI for real-time transcription, translation, and academic session capture. It is designed for lectures, seminars, conferences, meetings, interviews, and recorded media.
 
-> This project is currently in beta. Pre-release builds use `betaXX` identifiers. Standard semantic version numbers will begin with the first stable release.
+> This project is currently in beta. Test builds use `beta x.y` identifiers. Standard semantic version numbers will begin with the first stable release.
 
 ## Highlights
 
-- Real-time bilingual transcript workspace
+- Real-time bilingual transcript workspace with synchronized scrolling and automatic follow-to-latest behavior
 - Chinese WebUI by default, switchable to English in Settings
 - Browser microphone, browser tab/screen audio, Windows WASAPI loopback, and media-file input
 - Academic glossary profiles and custom terminology
@@ -132,7 +132,8 @@ Target languages currently include Chinese, English, Japanese, Korean, French, G
 
 During a live session you can:
 
-- see original text and translation side-by-side;
+- view original text and translation side-by-side with synchronized scrolling;
+- automatically follow the newest segment; manually scrolling upward pauses auto-follow until you return to the bottom;
 - add terminology profiles;
 - mark content as Important, Question, Idea, Reference, Follow-up, or Note;
 - capture the current screen as a slide snapshot;
@@ -141,9 +142,9 @@ During a live session you can:
 
 ## Migration from older local builds
 
-`beta01` intentionally **does not automatically reuse** v0.1/v0.2/v0.3 AppData folders. This prevents surprising cross-version records and hidden C-drive usage.
+`beta 0.1` intentionally **does not automatically reuse** v0.1/v0.2/v0.3 AppData folders. This prevents surprising cross-version records and hidden C-drive usage.
 
-Existing beta01 configs that used the earlier ASR mode names are automatically migrated to the unified `OpenAI Chat Completions` mode. A previous Malay target setting falls back to Chinese.
+Older beta configs using the previous ASR mode names are automatically migrated to the unified `OpenAI Chat Completions` mode. A previous Malay target setting falls back to Chinese.
 
 ## Development
 
