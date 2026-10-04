@@ -157,18 +157,8 @@ async def test_provider(cfg: ProviderConfig, academic: AcademicConfig|None=None)
 
 async def transcribe_wav(wav_bytes: bytes, cfg: ProviderConfig, language: str="auto", prompt: str="") -> tuple[str,str|None]:
     if cfg.mode == "local_whisper": return await asyncio.to_thread(_local_whisper_transcribe,wav_bytes,cfg,language,prompt)
-    if cfg.mode == "openai_transcriptions": return await _transcribe_openai_endpoint(wav_bytes,cfg,language,prompt)
-    if cfg.mode == "openai_chat_audio": return await _transcribe_chat_audio(wav_bytes,cfg,language,prompt)
+    if cfg.mode == "openai_chat": return await _transcribe_chat_audio(wav_bytes,cfg,language,prompt)
     raise ValueError(f"ASR provider mode '{cfg.mode}' cannot transcribe audio")
-
-async def _transcribe_openai_endpoint(wav_bytes: bytes, cfg: ProviderConfig, language: str, prompt: str) -> tuple[str,str|None]:
-    url = cfg.endpoint or f"{normalize_base_url(cfg.base_url)}/audio/transcriptions"
-    data={"model":cfg.model,"response_format":"json","temperature":str(cfg.temperature)}
-    if language and language.lower() != "auto": data["language"] = language
-    if prompt: data["prompt"] = prompt
-    r = await (await http_client()).post(url,headers=auth_headers(cfg),data=data,files={"file":("segment.wav",wav_bytes,"audio/wav")},timeout=cfg.timeout_seconds)
-    r.raise_for_status(); payload=r.json()
-    return clean_asr_text(str(payload.get("text") or payload.get("transcription") or "")), payload.get("language")
 
 async def _transcribe_chat_audio(wav_bytes: bytes, cfg: ProviderConfig, language: str, prompt: str) -> tuple[str,str|None]:
     url = cfg.endpoint or f"{normalize_base_url(cfg.base_url)}/chat/completions"
