@@ -20,7 +20,9 @@ jobs:
           python-version: '3.13'
 
       - name: Validate WebUI JavaScript
-        run: node --check static/app.js
+        run: |
+          node --check static/app.js
+          node --check static/native_capture_ui.js
 
       - name: Install test dependencies
         run: |

@@ -1,5 +1,18 @@
 # Changelog
 
+## beta 0.3 — 2026-10-04
+
+Windows native-microphone reliability beta.
+
+- Fixed Windows native microphone capture for external / USB microphones that are detected correctly but fail to deliver audio.
+- Native microphone enumeration is now restricted to WASAPI endpoints, removing duplicate MME / DirectSound-style entries.
+- The native capture backend now negotiates a compatible PCM16 sample-rate/channel combination instead of assuming `defaultSampleRate + maxInputChannels` will open successfully.
+- Microphone capture prefers mono for speech recognition while WASAPI loopback continues to prefer stereo.
+- The WebUI now waits for a real native audio-level packet before marking Windows microphone startup as successful.
+- Added actionable timeout / connection messages when a native microphone opens but no audio stream arrives.
+- Added beta 0.3 unit coverage for native capture format preference.
+- Retains the beta 0.2 experimental Document Picture-in-Picture floating window.
+
 ## beta 0.2 — 2026-10-04
 
 Floating-window beta focused on single-screen academic use.

@@ -2,11 +2,24 @@
 
 **简体中文** | [English](./README.en.md)
 
-**beta 0.2 · WebUI · 默认便携模式**
+**beta 0.3 · WebUI · 默认便携模式**
 
 Academic Live Translator 是一个本地优先的 WebUI，用于实时语音转录、翻译与学术场景记录。它面向课堂、研讨会、学术会议、日常会议、访谈以及已有音视频材料等使用场景。
 
 > 本项目目前处于 Beta 阶段。预发布版本统一使用 `beta x.y` 作为版本标识；首个稳定版本发布后再开始使用正式语义化版本号。
+
+## beta 0.3：Windows 原生麦克风兼容性修复
+
+beta 0.3 重点修复 Windows 原生麦克风（WASAPI）在外接 / USB 麦克风场景中“设备可以识别、但没有音频输入”的问题。
+
+- 原生麦克风列表只保留 WASAPI 输入端点，减少同一物理设备通过 MME / DirectSound / WASAPI 重复出现；
+- 打开麦克风时不再固定使用 `defaultSampleRate + maxInputChannels`，而是自动尝试设备默认值以及 48 kHz / 44.1 kHz / 32 kHz / 24 kHz / 16 kHz；
+- 语音识别优先使用单声道，失败时再回退到设备支持的其他声道组合；
+- Windows 系统音频回环仍优先使用立体声；
+- WebUI 在收到真实音频电平数据后才认为原生麦克风启动成功；
+- 若 7 秒内没有任何原生音频数据，会显示明确的 WASAPI / 独占模式排查提示。
+
+beta 0.2 的实验性悬浮窗功能继续保留。
 
 ## beta 0.2 新功能：悬浮窗（Experimental）
 
@@ -41,7 +54,7 @@ beta 0.2 新增实验性的 **Floating Window / 悬浮窗**。在支持 Document
 - **实验性置顶悬浮双语字幕窗口**
 - 原文 / 翻译双栏同步滚动与自动跟随最新内容
 - WebUI 默认中文，可在 Settings 中切换中文 / English
-- 支持浏览器麦克风、浏览器标签页/屏幕音频、Windows WASAPI 系统音频回环以及音视频文件输入
+- 支持浏览器麦克风、浏览器标签页/屏幕音频、Windows WASAPI 系统音频回环、Windows 原生麦克风以及音视频文件输入
 - 学术术语表 Profile 与自定义术语
 - Important / Question / Idea / Reference / Follow-up / Note 等学术标记
 - 课程 PPT / 屏幕截图记录
@@ -82,7 +95,7 @@ academic-live-translator/
 ## 前置条件
 
 - Python 3.11–3.13
-- 如需原生 WASAPI 系统音频捕获，需要 Windows 10/11
+- 如需原生 WASAPI 系统音频或麦克风捕获，需要 Windows 10/11
 - 浏览器音频捕获推荐使用 Chrome / Edge
 - **悬浮窗实验功能推荐桌面版 Chrome / Edge，并要求浏览器支持 Document Picture-in-Picture**
 - 推荐安装 FFmpeg，用于媒体格式转换与 FLAC 录音
@@ -111,7 +124,7 @@ chmod +x start_webui.sh
 ./start_webui.sh
 ```
 
-Linux/macOS 暂不支持 Windows 原生 WASAPI 系统音频捕获，但浏览器麦克风、标签页/屏幕音频捕获以及 Media 文件处理功能仍然可以使用。悬浮窗能力取决于所用浏览器是否实现 Document Picture-in-Picture。
+Linux/macOS 暂不支持 Windows 原生 WASAPI 音频捕获，但浏览器麦克风、标签页/屏幕音频捕获以及 Media 文件处理功能仍然可以使用。悬浮窗能力取决于所用浏览器是否实现 Document Picture-in-Picture。
 
 ## 默认 Provider
 
@@ -189,9 +202,9 @@ WebUI 默认使用中文，可在 `Settings → 界面 → 语言` 中切换为 
 
 ## 从旧版迁移
 
-beta 0.2 继续使用 Portable-by-default 存储，不会自动复用早期 v0.1 / v0.2 / v0.3 位于 AppData 中的数据目录。
+beta 0.3 继续使用 Portable-by-default 存储，不会自动复用早期 v0.1 / v0.2 / v0.3 位于 AppData 中的数据目录。
 
-现有 beta 0.1 配置可以直接读取；新增的悬浮窗宽度、高度和字号会自动使用默认值，无需手工迁移配置。
+现有 beta 0.1 / beta 0.2 配置可以直接读取；beta 0.3 不需要手工迁移配置。
 
 ## 开发
 

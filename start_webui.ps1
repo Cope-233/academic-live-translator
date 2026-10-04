@@ -39,6 +39,6 @@ Write-Host "[setup] Installing/updating dependencies ..."
 Write-Host "[setup] Preparing the default local ASR model (first run only) ..."
 & $venvPython -m app.bootstrap
 
-Write-Host "[start] Academic Live Translator beta 0.2 -> http://127.0.0.1:8765"
+Write-Host "[start] Academic Live Translator beta 0.3 -> http://127.0.0.1:8765"
 Start-Process "http://127.0.0.1:8765"
 & $venvPython run.py

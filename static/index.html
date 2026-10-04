@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Academic Live Translator beta 0.2</title>
+  <title>Academic Live Translator beta 0.3</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
 <div class="shell">
   <aside class="sidebar">
-    <div class="brand"><b>ALT</b><div><strong>Academic Live Translator</strong><span>beta 0.2 · WebUI</span></div></div>
+    <div class="brand"><b>ALT</b><div><strong>Academic Live Translator</strong><span>beta 0.3 · WebUI</span></div></div>
     <nav>
       <button class="nav active" data-view="live">◉ <span data-i18n="navLive">实时</span></button>
       <button class="nav" data-view="media">▣ <span data-i18n="navMedia">媒体</span></button>
@@ -68,4 +68,4 @@
       <div class="card pad wide"><h2 data-i18n="academicCapture">学术与采集</h2><div class="grid"><label><span data-i18n="source">源语言</span><select id="sourceLanguage"><option value="auto" data-i18n="auto">自动</option><option value="English">English</option><option value="Chinese">中文</option><option value="Japanese">日本語</option><option value="Korean">한국어</option><option value="French">Français</option><option value="German">Deutsch</option><option value="Spanish">Español</option><option value="Malay">Bahasa Melayu</option></select></label><label><span data-i18n="target">目标语言</span><select id="targetLanguage"><option value="Chinese">中文</option><option value="English">English</option><option value="Japanese">日本語</option><option value="Korean">한국어</option><option value="French">Français</option><option value="German">Deutsch</option><option value="Spanish">Español</option><option value="Arabic">العربية</option></select></label><label><span data-i18n="translationMode">翻译模式</span><select id="translationMode"><option value="low_latency" data-i18n="lowestLatency">最低延迟</option><option value="balanced" data-i18n="balanced">平衡</option><option value="context" data-i18n="highestContext">最高上下文</option></select></label><label>Silence end (ms)<input id="silenceMs" type="number"></label><label>Min speech (ms)<input id="minSpeechMs" type="number"></label><label>Max segment (ms)<input id="maxSegmentMs" type="number"></label><label><span data-i18n="saveAudio">保存音频</span><select id="saveAudio"><option value="true" data-i18n="yes">是</option><option value="false" data-i18n="no">否</option></select></label><label>Audio format<select id="audioFormat"><option value="flac">FLAC</option><option value="wav">WAV</option></select></label></div><label><span data-i18n="customGlossary">自定义术语表</span><textarea id="glossary" rows="7"></textarea></label><button id="saveSettingsBtn" class="primary" data-i18n="saveSettings">保存设置</button><p id="saveStatus" class="muted"></p></div>
     </div></section>
   </main>
-</div><div id="toast"></div><script src="/static/app.js"></script></body></html>
+</div><div id="toast"></div><script src="/static/app.js"></script><script src="/static/native_capture_ui.js"></script></body></html>

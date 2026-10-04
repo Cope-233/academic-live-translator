@@ -1,10 +1,11 @@
 from app import __version__
 from app.models import AppConfig
 from app.config import CACHE_DIR, DATA_DIR, MODELS_DIR, PROJECT_ROOT, _migrate_config
+from app.native_capture import _capture_candidates
 
 
 def test_version():
-    assert __version__ == "beta 0.2"
+    assert __version__ == "beta 0.3"
 
 
 def test_defaults():
@@ -30,6 +31,16 @@ def test_portable_paths():
     assert DATA_DIR == PROJECT_ROOT / "data"
     assert MODELS_DIR == PROJECT_ROOT / "models"
     assert CACHE_DIR == PROJECT_ROOT / "cache"
+
+
+def test_native_microphone_prefers_mono_wasapi_format():
+    device = {"defaultSampleRate": 48000, "maxInputChannels": 2}
+    assert _capture_candidates(device, False)[0] == (48000, 1)
+
+
+def test_native_loopback_prefers_stereo_wasapi_format():
+    device = {"defaultSampleRate": 48000, "maxInputChannels": 2}
+    assert _capture_candidates(device, True)[0] == (48000, 2)
 
 
 def test_legacy_asr_migration():

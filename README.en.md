@@ -2,11 +2,24 @@
 
 [简体中文](./README.md) | **English**
 
-**beta 0.2 · WebUI · portable by default**
+**beta 0.3 · WebUI · portable by default**
 
 Academic Live Translator is a local-first WebUI for real-time transcription, translation, and academic session capture. It is designed for lectures, seminars, conferences, meetings, interviews, and recorded media.
 
 > This project is currently in beta. Pre-release builds use `beta x.y` identifiers. Standard semantic version numbers will begin with the first stable release.
+
+## New in beta 0.3: Windows native microphone reliability
+
+beta 0.3 fixes the Windows native microphone (WASAPI) path for external / USB microphones that are visible in the device list but never deliver audio.
+
+- Native microphone enumeration is restricted to WASAPI input endpoints, reducing duplicate MME / DirectSound / WASAPI entries for the same physical device.
+- Capture no longer assumes `defaultSampleRate + maxInputChannels` is always openable. It negotiates the device default plus 48 kHz / 44.1 kHz / 32 kHz / 24 kHz / 16 kHz combinations.
+- Speech capture prefers mono and falls back to other supported channel counts when necessary.
+- WASAPI loopback continues to prefer stereo.
+- The WebUI waits for a real audio-level packet before treating Windows microphone startup as successful.
+- If no native audio arrives within seven seconds, the UI shows an actionable WASAPI / exclusive-mode message.
+
+The beta 0.2 experimental Floating Window remains available.
 
 ## New in beta 0.2: Floating Window (Experimental)
 
@@ -39,7 +52,7 @@ beta 0.2 adds an experimental **Floating Window** powered by Document Picture-in
 - **Experimental always-on-top bilingual floating window**
 - Synchronized original/translation scrolling with auto-follow to the latest segment
 - Chinese WebUI by default, switchable to English in Settings
-- Browser microphone, browser tab/screen audio, Windows WASAPI loopback, and media-file input
+- Browser microphone, browser tab/screen audio, Windows WASAPI loopback, Windows native microphone, and media-file input
 - Academic glossary profiles and custom terminology
 - Important / Question / Idea / Reference / Follow-up / Note markers
 - Screenshot capture for slides
@@ -80,7 +93,7 @@ You can override storage locations with `ALT_DATA_DIR`, `ALT_MODELS_DIR`, `ALT_C
 ## Requirements
 
 - Python 3.11–3.13
-- Windows 10/11 for native WASAPI loopback capture
+- Windows 10/11 for native WASAPI system-audio or microphone capture
 - Chrome / Edge recommended for browser audio capture
 - **The experimental Floating Window requires a desktop browser with Document Picture-in-Picture support; recent Chrome / Edge is recommended**
 - FFmpeg recommended for media conversion and FLAC recording
@@ -109,7 +122,7 @@ chmod +x start_webui.sh
 ./start_webui.sh
 ```
 
-Native Windows system-audio capture is unavailable on Linux/macOS, but browser microphone/tab/screen capture and media-file workflows remain available. Floating Window support depends on whether the selected browser implements Document Picture-in-Picture.
+Native Windows WASAPI capture is unavailable on Linux/macOS, but browser microphone/tab/screen capture and media-file workflows remain available. Floating Window support depends on whether the selected browser implements Document Picture-in-Picture.
 
 ## Default providers
 
@@ -183,9 +196,9 @@ During a live session you can:
 
 ## Migration from older local builds
 
-beta 0.2 keeps the portable-by-default storage model and does not automatically reuse older v0.1/v0.2/v0.3 AppData folders.
+beta 0.3 keeps the portable-by-default storage model and does not automatically reuse older v0.1/v0.2/v0.3 AppData folders.
 
-Existing beta 0.1 configs load directly. The new floating-window width, height, and font-size settings receive safe defaults automatically, so no manual config migration is required.
+Existing beta 0.1 / beta 0.2 configs load directly; beta 0.3 requires no manual config migration.
 
 ## Development
 
