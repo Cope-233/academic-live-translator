@@ -8,38 +8,6 @@ Academic Live Translator 是一个本地优先的实时语音转录、翻译与�
 
 > Beta 阶段统一使用 `beta x.y` 作为版本标识；首个稳定版本发布后再开始使用正式语义化版本号。
 
-## beta 0.5：Whisper / Bing 与 Windows 安装修复
-
-beta 0.5 修复了 beta 0.4 Windows CUDA runtime 安装失败、Whisper 自动选择 CUDA 后无法推理，以及设置初始化时过早点击测试/监听会报错的问题。实时 Whisper 原文优先显示与 Bing 返回值解析也经过了真实 provider 和浏览器音频链路验证。
-
-Windows 运行时安装改用系统自带的 `tar.exe` 解压 CUDA bundle，避免 `py7zr` 不支持该压缩包使用的 BCJ2 filter；安装器会验证每一步的退出码和真实 CUDA 推理结果，安装失败时不会启动 WebUI，也不会留下“已完成”的标记。应用启动时会自动注册项目内 CUDA DLL 目录。WASAPI 麦克风与系统音频在设备成功打开后即进入监听；静音时不会再被误判为采集失败。
-
-### 实时链路修复
-
-实时处理现在采用：
-
-```text
-音频 → ASR → 原文立即显示并保存 → 翻译 → 原位置补充译文
-```
-
-因此：
-
-- Whisper 一旦识别完成，原文会立即出现，不再等待翻译服务；
-- Bing、Microsoft Translator 或 OpenAI-compatible 翻译服务失败时，已经识别的原文仍会保留；
-- 翻译完成后会更新同一个 Segment，不会重复生成一条记录；
-- ASR 与 Translation 错误会分阶段记录，便于判断到底是哪一层失败。
-
-### Bing Free 修复
-
-- 正确读取 `mintrans` 返回的 `translations[0].text`；
-- 自动检测源语言使用 `auto-detect`；
-- 简体中文使用 `zh-Hans`，繁体中文使用 `zh-Hant`；
-- “测试翻译”现在真正验证 Bing 返回的译文。
-
-### Local Faster-Whisper 检测改进
-
-“测试 ASR”不再只验证 `WhisperModel` 能否创建，而会真正执行一次推理。因此像 `cublas64_12.dll` 缺失这类 CUDA Runtime 问题会在测试阶段直接暴露。
-
 ## Windows 一键安装
 
 ### 最简单：双击
