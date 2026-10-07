@@ -14,7 +14,7 @@ from app import main
 
 
 def test_version():
-    assert __version__ == "beta 0.6"
+    assert __version__ == "beta 0.7"
 
 
 def test_defaults():
@@ -26,6 +26,10 @@ def test_defaults():
     assert cfg.asr.mode == "local_whisper"
     assert cfg.asr.model == "base"
     assert cfg.translation.mode == "bing_web"
+    assert cfg.providers.active_asr == "local_whisper"
+    assert cfg.providers.active_translation == "bing_web"
+    assert cfg.providers.asr["openai_chat"].mode == "openai_chat"
+    assert cfg.providers.translation["azure_translator"].mode == "azure_translator"
     assert cfg.academic.target_language == "Chinese"
 
 
@@ -165,5 +169,78 @@ def test_legacy_asr_migration():
     migrated = _migrate_config(raw)
     assert migrated["asr"]["mode"] == "openai_chat"
     assert migrated["asr"]["endpoint"] is None
+    assert migrated["providers"]["active_asr"] == "openai_chat"
     assert migrated["academic"]["target_language"] == "Chinese"
     assert migrated["interface"]["language"] == "zh-CN"
+
+
+def test_beta06_remote_config_is_migrated_into_its_profile():
+    raw = {
+        "asr": {
+            "name": "llama.cpp ASR",
+            "mode": "openai_chat",
+            "base_url": "http://127.0.0.1:8080/v1",
+            "api_key": "local-key",
+            "model": "Qwen3-ASR-1.7B",
+            "endpoint": "/chat/completions",
+        },
+        "translation": {
+            "name": "Bing Translate (Free)",
+            "mode": "bing_web",
+            "model": "bing",
+        },
+    }
+    migrated = _migrate_config(raw)
+    profile = migrated["providers"]["asr"]["openai_chat"]
+
+    assert migrated["providers"]["active_asr"] == "openai_chat"
+    assert profile["base_url"] == "http://127.0.0.1:8080/v1"
+    assert profile["api_key"] == "local-key"
+    assert profile["model"] == "Qwen3-ASR-1.7B"
+    assert migrated["asr"] == profile
+
+
+def test_inactive_provider_profiles_survive_active_provider_changes():
+    raw = AppConfig().model_dump()
+    raw["providers"]["active_asr"] = "local_whisper"
+    raw["providers"]["asr"]["openai_chat"].update({
+        "name": "llama.cpp ASR",
+        "base_url": "http://127.0.0.1:8080/v1",
+        "api_key": "keep-me",
+        "model": "Qwen3-ASR-1.7B",
+        "endpoint": "/chat/completions",
+    })
+    raw["providers"]["active_translation"] = "bing_web"
+    raw["providers"]["translation"]["openai_chat"].update({
+        "name": "Local LLM Translation",
+        "base_url": "http://127.0.0.1:8080/v1",
+        "api_key": "translate-key",
+        "model": "Qwen3-4B",
+    })
+
+    migrated = _migrate_config(raw)
+
+    assert migrated["asr"]["mode"] == "local_whisper"
+    assert migrated["translation"]["mode"] == "bing_web"
+    assert migrated["providers"]["asr"]["openai_chat"]["api_key"] == "keep-me"
+    assert migrated["providers"]["asr"]["openai_chat"]["model"] == "Qwen3-ASR-1.7B"
+    assert migrated["providers"]["translation"]["openai_chat"]["api_key"] == "translate-key"
+    assert migrated["providers"]["translation"]["openai_chat"]["model"] == "Qwen3-4B"
+
+
+def test_active_profile_is_restored_even_if_legacy_mirror_is_stale():
+    raw = AppConfig().model_dump()
+    raw["providers"]["active_asr"] = "openai_chat"
+    raw["providers"]["asr"]["openai_chat"].update({
+        "name": "llama.cpp ASR",
+        "base_url": "http://127.0.0.1:8080/v1",
+        "model": "Qwen3-ASR-1.7B",
+    })
+    raw["asr"] = AppConfig().asr.model_dump()
+
+    migrated = _migrate_config(raw)
+
+    assert migrated["providers"]["active_asr"] == "openai_chat"
+    assert migrated["asr"]["mode"] == "openai_chat"
+    assert migrated["asr"]["name"] == "llama.cpp ASR"
+    assert migrated["asr"]["model"] == "Qwen3-ASR-1.7B"

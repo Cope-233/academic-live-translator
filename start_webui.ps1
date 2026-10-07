@@ -23,20 +23,22 @@ if (Test-Path $cudaBin) {
     $env:PATH = "$cudaBin;$env:PATH"
 }
 
+# beta 0.7 does not change the portable runtime bundle, so existing beta 0.6
+# installation assets remain valid and do not need to be downloaded again.
 $marker = Join-Path $PSScriptRoot "data\.installed-beta-0.6"
 $venvPython = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path $marker) -or -not (Test-Path $venvPython)) {
-    Write-Host "[setup] First beta 0.6 launch: running one-click portable installation..."
+    Write-Host "[setup] Portable runtime assets are missing; running one-click installation..."
     & (Join-Path $PSScriptRoot "install.ps1")
 }
 if (-not (Test-Path $marker)) {
-    throw "Portable installation failed; refusing to start before beta 0.6 setup is complete."
+    throw "Portable installation failed; refusing to start before runtime setup is complete."
 }
 
 if (-not (Test-Path $venvPython)) {
     throw "Portable Python environment was not created successfully."
 }
 
-Write-Host "[start] Academic Live Translator beta 0.6 -> http://127.0.0.1:8765"
+Write-Host "[start] Academic Live Translator beta 0.7 -> http://127.0.0.1:8765"
 Start-Process "http://127.0.0.1:8765"
 & $venvPython run.py

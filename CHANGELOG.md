@@ -1,5 +1,18 @@
 # Changelog
 
+## beta 0.7 — 2026-10-07
+
+Persistent provider-profile beta focused on reliable local/remote configuration switching.
+
+- Added independent ASR profiles for Local Whisper and OpenAI-compatible services such as llama.cpp, vLLM, LM Studio, and LocalAI.
+- Added independent translation profiles for Bing Free, Microsoft Translator, and OpenAI-compatible services.
+- The WebUI now restores the last saved active ASR and translation providers during startup instead of showing the HTML fallback choices first.
+- Switching providers now stores the previous provider's form state and loads the selected provider's own settings without clearing inactive URLs, API keys, endpoints, models, device choices, or regions.
+- Removed the beta 0.4–0.6 behavior that erased OpenAI-compatible / llama.cpp fields when Local Whisper or Bing was saved.
+- Existing beta 0.6 `data/config.json` files are migrated automatically: the currently configured providers are placed into provider-specific profiles while runtime-compatible `asr` and `translation` mirrors are preserved.
+- Added provider-profile migration and persistence tests, including stale legacy-mirror recovery and inactive-profile retention.
+- Fixed the beta 0.6 floating-window wrapper name collision and updated the WebUI/floating-window version label to beta 0.7.
+
 ## beta 0.6 — 2026-10-04
 
 Apple silicon and cross-platform installation beta.
