@@ -286,6 +286,14 @@
     $('contextSegments').value = academic.context_segments ?? 1;
     $('preserveAcademicTerms').value = String(academic.preserve_academic_terms ?? true);
     $('screenshotMonitor').value = capture.screenshot_monitor ?? 1;
+    if ($('liveSourceLanguage')) $('liveSourceLanguage').value = academic.source_language || 'auto';
+    if ($('liveTargetLanguage')) $('liveTargetLanguage').value = academic.target_language || 'Chinese';
+  }
+
+  function restoreBeta08Ui(config) {
+    restoreProviderUi(config);
+    restoreCustomSettings(config);
+    applyLanguage(config.interface?.language || 'zh-CN');
   }
 
   function switchAsrProfile() {
@@ -337,9 +345,7 @@
   const baseLoadConfig = loadConfig;
   loadConfig = async function loadConfigBeta08() {
     const config = await baseLoadConfig();
-    restoreProviderUi(config);
-    restoreCustomSettings(config);
-    applyLanguage(config.interface?.language || 'zh-CN');
+    restoreBeta08Ui(config);
     return config;
   };
 
@@ -361,6 +367,12 @@
     c.academic.preserve_academic_terms = $('preserveAcademicTerms').value === 'true';
     c.capture.screenshot_monitor = Math.max(1, Number($('screenshotMonitor').value) || 1);
     return c;
+  };
+
+  const baseSaveConfig = saveConfig;
+  saveConfig = async function saveConfigBeta08() {
+    await baseSaveConfig();
+    restoreCustomSettings(state.config);
   };
 
   const baseSyncLive = syncLive;
@@ -477,10 +489,10 @@
   if (brandVersion) brandVersion.textContent = 'beta 0.8 · WebUI';
 
   if (state.config) {
-    restoreProviderUi(state.config);
-    restoreCustomSettings(state.config);
-    applyLanguage(state.config.interface?.language || 'zh-CN');
+    restoreBeta08Ui(state.config);
   } else {
-    ensureConfigLoaded().catch(error => toast(`${tr('startupError')}: ${error.message}`));
+    ensureConfigLoaded()
+      .then(config => restoreBeta08Ui(config))
+      .catch(error => toast(`${tr('startupError')}: ${error.message}`));
   }
 })();
