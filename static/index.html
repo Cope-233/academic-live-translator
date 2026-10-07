@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Academic Live Translator beta 0.7</title>
+  <title>Academic Live Translator beta 0.8</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
 <div class="shell">
   <aside class="sidebar">
-    <div class="brand"><b>ALT</b><div><strong>Academic Live Translator</strong><span>beta 0.7 · WebUI</span></div></div>
+    <div class="brand"><b>ALT</b><div><strong>Academic Live Translator</strong><span>beta 0.8 · WebUI</span></div></div>
     <nav>
       <button class="nav active" data-view="live">◉ <span data-i18n="navLive">实时</span></button>
       <button class="nav" data-view="media">▣ <span data-i18n="navMedia">媒体</span></button>
@@ -27,6 +27,7 @@
         <label id="nativeDeviceWrap" hidden><span data-i18n="device">设备</span><select id="nativeDevice"></select></label>
         <label><span data-i18n="source">源语言</span><select id="liveSourceLanguage"><option value="auto" data-i18n="auto">自动</option><option value="English">English</option><option value="Chinese">中文</option><option value="Japanese">日本語</option><option value="Korean">한국어</option><option value="French">Français</option><option value="German">Deutsch</option><option value="Spanish">Español</option><option value="Malay">Bahasa Melayu</option></select></label>
         <label><span data-i18n="target">目标语言</span><select id="liveTargetLanguage"><option value="Chinese">中文</option><option value="English">English</option><option value="Japanese">日本語</option><option value="Korean">한국어</option><option value="French">Français</option><option value="German">Deutsch</option><option value="Spanish">Español</option><option value="Arabic">العربية</option></select></label>
+        <label><span data-i18n="outputMode">输出模式</span><select id="liveOutputMode"><option value="sentence" data-i18n="sentenceMode">整句模式</option><option value="realtime" data-i18n="realtimeMode">实时模式 · Experimental</option></select></label>
         <button id="micBtn" class="primary" data-i18n="startListening">开始监听</button>
       </div>
       <div class="sessionbar">
@@ -65,7 +66,52 @@
       </div>
       <div class="card pad"><h2>ASR Provider</h2><p class="muted" data-i18n="asrHint">本地 Whisper 会自动选择当前平台可用的加速方式，也可以手动指定 CPU。</p><label><span data-i18n="type">类型</span><select id="asrMode"><option value="local_whisper">Local Whisper</option><option value="openai_chat">OpenAI Chat Completions</option></select></label><label><span data-i18n="name">名称</span><input id="asrName"></label><div id="asrLocal"><label>Whisper model<select id="asrModel"><option value="tiny">tiny</option><option value="base">base</option><option value="small">small</option><option value="medium">medium</option><option value="large-v3-turbo">large-v3-turbo</option></select></label><label><span data-i18n="device">设备</span><select id="asrDevice"><option value="auto" data-i18n="auto">自动</option><option value="cpu">CPU</option><option value="cuda">CUDA</option><option value="apple">Apple silicon GPU（MLX / Metal）</option></select></label><label>Compute<input id="asrCompute"></label></div><div id="asrRemote"><label>Base URL<input id="asrBaseUrl" placeholder="http://127.0.0.1:8080/v1"></label><label>Model<input id="asrModelRemote"></label><label>API key<input id="asrApiKey" type="password"></label><label>Custom endpoint<input id="asrEndpoint" placeholder="/chat/completions"></label></div><button id="testAsrBtn" data-i18n="testAsr">测试 ASR</button><small id="asrTestResult"></small></div>
       <div class="card pad"><h2>Translation Provider</h2><p class="muted" data-i18n="translationHint">Bing Free 无需密钥但属于实验性方案；稳定部署可使用 Microsoft Translator 或 OpenAI-compatible 服务。</p><label><span data-i18n="type">类型</span><select id="mtMode"><option value="bing_web">Bing Free (experimental)</option><option value="azure_translator">Microsoft Translator</option><option value="openai_chat">OpenAI Chat Completions</option></select></label><label><span data-i18n="name">名称</span><input id="mtName"></label><div id="mtOpenAI"><label>Base URL<input id="mtBaseUrl"></label><label>Model<input id="mtModel"></label><label>API key<input id="mtApiKey" type="password"></label></div><div id="mtAzure"><label>API key<input id="mtAzureKey" type="password"></label><label>Region<input id="mtRegion"></label></div><button id="testMtBtn" data-i18n="testTranslation">测试翻译</button><small id="mtTestResult"></small></div>
-      <div class="card pad wide"><h2 data-i18n="academicCapture">学术与采集</h2><div class="grid"><label><span data-i18n="source">源语言</span><select id="sourceLanguage"><option value="auto" data-i18n="auto">自动</option><option value="English">English</option><option value="Chinese">中文</option><option value="Japanese">日本語</option><option value="Korean">한국어</option><option value="French">Français</option><option value="German">Deutsch</option><option value="Spanish">Español</option><option value="Malay">Bahasa Melayu</option></select></label><label><span data-i18n="target">目标语言</span><select id="targetLanguage"><option value="Chinese">中文</option><option value="English">English</option><option value="Japanese">日本語</option><option value="Korean">한국어</option><option value="French">Français</option><option value="German">Deutsch</option><option value="Spanish">Español</option><option value="Arabic">العربية</option></select></label><label><span data-i18n="translationMode">翻译模式</span><select id="translationMode"><option value="low_latency" data-i18n="lowestLatency">最低延迟</option><option value="balanced" data-i18n="balanced">平衡</option><option value="context" data-i18n="highestContext">最高上下文</option></select></label><label>Silence end (ms)<input id="silenceMs" type="number"></label><label>Min speech (ms)<input id="minSpeechMs" type="number"></label><label>Max segment (ms)<input id="maxSegmentMs" type="number"></label><label><span data-i18n="saveAudio">保存音频</span><select id="saveAudio"><option value="true" data-i18n="yes">是</option><option value="false" data-i18n="no">否</option></select></label><label>Audio format<select id="audioFormat"><option value="flac">FLAC</option><option value="wav">WAV</option></select></label></div><label><span data-i18n="customGlossary">自定义术语表</span><textarea id="glossary" rows="7"></textarea></label><button id="saveSettingsBtn" class="primary" data-i18n="saveSettings">保存设置</button><p id="saveStatus" class="muted"></p></div>
+      <div class="card pad wide custom-settings-card">
+        <div class="custom-settings-heading"><div><h2 data-i18n="customSettings">自定义设置</h2><p class="muted" data-i18n="customSettingsHint">以下参数都有可直接使用的默认值。修改后会保存到本地配置，下次启动自动恢复。</p></div></div>
+
+        <div class="settings-section">
+          <h3 data-i18n="translationSettings">语言与翻译</h3>
+          <div class="grid">
+            <label><span data-i18n="source">源语言</span><select id="sourceLanguage"><option value="auto" data-i18n="auto">自动</option><option value="English">English</option><option value="Chinese">中文</option><option value="Japanese">日本語</option><option value="Korean">한국어</option><option value="French">Français</option><option value="German">Deutsch</option><option value="Spanish">Español</option><option value="Malay">Bahasa Melayu</option></select></label>
+            <label><span data-i18n="target">目标语言</span><select id="targetLanguage"><option value="Chinese">中文</option><option value="English">English</option><option value="Japanese">日本語</option><option value="Korean">한국어</option><option value="French">Français</option><option value="German">Deutsch</option><option value="Spanish">Español</option><option value="Arabic">العربية</option></select></label>
+            <label><span data-i18n="translationMode">翻译模式</span><select id="translationMode"><option value="low_latency" data-i18n="lowestLatency">最低延迟</option><option value="balanced" data-i18n="balanced">平衡</option><option value="context" data-i18n="highestContext">最高上下文</option></select></label>
+            <label><span data-i18n="contextSegments">上下文片段数</span><input id="contextSegments" type="number" min="0" max="5" step="1"></label>
+            <label><span data-i18n="preserveTerms">保护学术术语</span><select id="preserveAcademicTerms"><option value="true" data-i18n="yes">是</option><option value="false" data-i18n="no">否</option></select></label>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3 data-i18n="speechSegmentation">语音检测与分段</h3>
+          <div class="grid">
+            <label><span data-i18n="speechThreshold">语音触发阈值</span><input id="speechThreshold" type="number" min="0.001" max="0.5" step="0.001"></label>
+            <label><span data-i18n="silenceEnd">停顿结束阈值 (ms)</span><input id="silenceMs" type="number" min="150" max="5000" step="10"></label>
+            <label><span data-i18n="minSpeech">最短语音长度 (ms)</span><input id="minSpeechMs" type="number" min="100" max="5000" step="10"></label>
+            <label><span data-i18n="maxSegment">最长语音片段 (ms)</span><input id="maxSegmentMs" type="number" min="3000" max="120000" step="100"></label>
+            <label><span data-i18n="preRoll">前置音频保留 (ms)</span><input id="preRollMs" type="number" min="0" max="2000" step="10"></label>
+          </div>
+        </div>
+
+        <div class="settings-section realtime-settings">
+          <div class="settings-section-title"><h3><span data-i18n="realtimeSettings">实时模式</span> <span class="experimental-badge">Experimental</span></h3><p class="muted" data-i18n="realtimeSettingsHint">实时模式使用增量 ASR 和节流后的增量翻译。数值越小延迟越低，但本地推理和网络请求会更频繁。</p></div>
+          <div class="grid">
+            <label><span data-i18n="realtimeMinAudio">首次增量识别等待 (ms)</span><input id="realtimeMinAudioMs" type="number" min="400" max="5000" step="50"></label>
+            <label><span data-i18n="partialInterval">ASR 更新间隔 (ms)</span><input id="partialIntervalMs" type="number" min="500" max="5000" step="50"></label>
+            <label><span data-i18n="partialTranslationInterval">翻译更新间隔 (ms)</span><input id="partialTranslationIntervalMs" type="number" min="800" max="10000" step="100"></label>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3 data-i18n="captureStorage">采集与保存</h3>
+          <div class="grid">
+            <label><span data-i18n="saveAudio">保存音频</span><select id="saveAudio"><option value="true" data-i18n="yes">是</option><option value="false" data-i18n="no">否</option></select></label>
+            <label><span data-i18n="audioFormat">音频格式</span><select id="audioFormat"><option value="flac">FLAC</option><option value="wav">WAV</option></select></label>
+            <label><span data-i18n="screenshotMonitor">截图显示器编号</span><input id="screenshotMonitor" type="number" min="1" max="16" step="1"></label>
+          </div>
+        </div>
+
+        <label><span data-i18n="customGlossary">自定义术语表</span><textarea id="glossary" rows="7"></textarea></label>
+        <button id="saveSettingsBtn" class="primary" data-i18n="saveSettings">保存设置</button><p id="saveStatus" class="muted"></p>
+      </div>
     </div></section>
   </main>
 </div><div id="toast"></div><script src="/static/app.js"></script><script src="/static/native_capture_ui.js"></script></body></html>
