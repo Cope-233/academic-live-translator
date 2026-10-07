@@ -233,7 +233,7 @@ async def _realtime_partial_worker(websocket: WebSocket, send_lock: asyncio.Lock
             try: await websocket.send_json({"type":"partial","phase":"asr","partial":partial})
             except Exception: return
 
-        due=(result.end_ms-state.get("last_translation_end_ms",0))>=cfg.live.partial_translation_interval_ms
+        due=(result.duration_ms-state.get("last_translation_duration_ms",0))>=cfg.live.partial_translation_interval_ms
         if not due:
             continue
         try:
@@ -244,7 +244,7 @@ async def _realtime_partial_worker(websocket: WebSocket, send_lock: asyncio.Lock
         if state["closed"] or token!=state["token"] or state.get("latest") is None:
             continue
         state["translation"]=translation
-        state["last_translation_end_ms"]=result.end_ms
+        state["last_translation_duration_ms"]=result.duration_ms
         partial["translation"]=translation
         async with send_lock:
             try: await websocket.send_json({"type":"partial","phase":"translation","partial":partial})
@@ -262,9 +262,9 @@ def _new_detector_for_session(session_id: str, cfg: AppConfig|None=None) -> Spee
 async def _run_pcm_stream(websocket: WebSocket, session_id: str, pcm_source, recorder: SessionAudioRecorder|None=None, send_ready: bool=True):
     cfg=load_config(); detector=_new_detector_for_session(session_id,cfg); send_lock=asyncio.Lock(); tasks:set[asyncio.Task]=set(); sequence=0
     realtime=cfg.live.output_mode=="realtime"
-    partial_state={"event":asyncio.Event(),"latest":None,"token":0,"closed":False,"translation":"","last_translation_end_ms":0}
+    partial_state={"event":asyncio.Event(),"latest":None,"token":0,"closed":False,"translation":"","last_translation_duration_ms":0}
     partial_task=asyncio.create_task(_realtime_partial_worker(websocket,send_lock,session_id,cfg,partial_state)) if realtime else None
-    last_partial_speech_ms=0.0
+    last_partial_speech_ms: float|None=None
     if send_ready: await websocket.send_json({"type":"ready","session_id":session_id,"output_mode":cfg.live.output_mode})
     try:
         async for pcm in pcm_source:
@@ -273,12 +273,14 @@ async def _run_pcm_stream(websocket: WebSocket, session_id: str, pcm_source, rec
             level,result=detector.feed(pcm); await websocket.send_json({"type":"level","value":level,"speech":detector.in_speech})
             if result:
                 if realtime:
-                    partial_state["token"]+=1; partial_state["latest"]=None; partial_state["translation"]=""; partial_state["last_translation_end_ms"]=0; partial_state["event"].set(); last_partial_speech_ms=0.0
+                    partial_state["token"]+=1; partial_state["latest"]=None; partial_state["translation"]=""; partial_state["last_translation_duration_ms"]=0; partial_state["event"].set(); last_partial_speech_ms=None
                 sequence+=1; task=asyncio.create_task(_process_live_segment(websocket,send_lock,session_id,result,sequence,cfg)); tasks.add(task); task.add_done_callback(tasks.discard)
                 await websocket.send_json({"type":"processing","sequence":sequence,"duration_ms":result.duration_ms})
                 continue
             if realtime and detector.in_speech and detector._speech_ms>=cfg.live.realtime_min_audio_ms:
-                if detector._speech_ms-last_partial_speech_ms>=cfg.live.partial_interval_ms:
+                first_partial=last_partial_speech_ms is None
+                interval_due=not first_partial and detector._speech_ms-last_partial_speech_ms>=cfg.live.partial_interval_ms
+                if first_partial or interval_due:
                     snapshot=detector.snapshot()
                     if snapshot:
                         partial_state["token"]+=1
@@ -286,7 +288,7 @@ async def _run_pcm_stream(websocket: WebSocket, session_id: str, pcm_source, rec
                         partial_state["event"].set()
                         last_partial_speech_ms=detector._speech_ms
             elif not detector.in_speech:
-                last_partial_speech_ms=0.0
+                last_partial_speech_ms=None
     finally:
         tail=detector.flush()
         if realtime:
