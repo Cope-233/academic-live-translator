@@ -9,6 +9,7 @@ TranslationProviderMode = Literal["bing_web","azure_translator","openai_chat"]
 SessionMode = Literal["live","media","lecture","meeting"]
 InputSource = Literal["microphone","browser_system","browser_mix","native_system","native_microphone","media_file"]
 MarkerKind = Literal["important","question","idea","reference","follow_up","note"]
+OutputMode = Literal["sentence","realtime"]
 
 class ProviderConfig(BaseModel):
     name: str = "Local Whisper"
@@ -77,11 +78,15 @@ class ProviderProfiles(BaseModel):
 
 class LiveConfig(BaseModel):
     sample_rate: int = 16000
+    output_mode: OutputMode = "sentence"
     speech_threshold: float = Field(default=0.010, ge=0.001, le=0.5)
     silence_ms: int = Field(default=420, ge=150, le=5000)
     min_speech_ms: int = Field(default=280, ge=100, le=5000)
     max_segment_ms: int = Field(default=12000, ge=3000, le=120000)
     pre_roll_ms: int = Field(default=220, ge=0, le=2000)
+    realtime_min_audio_ms: int = Field(default=900, ge=400, le=5000)
+    partial_interval_ms: int = Field(default=1000, ge=500, le=5000)
+    partial_translation_interval_ms: int = Field(default=1800, ge=800, le=10000)
 
 class CaptureConfig(BaseModel):
     input_source: InputSource = "microphone"

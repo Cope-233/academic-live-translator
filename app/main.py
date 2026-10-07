@@ -177,8 +177,8 @@ async def process_file(file: UploadFile=File(...), title: str|None=None):
     except Exception as exc: raise HTTPException(502,f"Model provider error: {exc}")
     return session.model_dump()
 
-async def _process_live_segment(websocket: WebSocket, send_lock: asyncio.Lock, session_id: str, result, sequence: int):
-    cfg=load_config()
+async def _process_live_segment(websocket: WebSocket, send_lock: asyncio.Lock, session_id: str, result, sequence: int, cfg: AppConfig|None=None):
+    cfg=cfg or load_config()
     try:
         source,detected=await transcribe_wav(result.wav_bytes,cfg.asr,language=cfg.academic.source_language,prompt=academic_hotwords(cfg.academic))
     except Exception as exc:
@@ -208,8 +208,51 @@ async def _process_live_segment(websocket: WebSocket, send_lock: asyncio.Lock, s
             try: await websocket.send_json({"type":"error","stage":"translation","sequence":sequence,"message":f"Translation: {exc}"})
             except Exception: pass
 
-def _new_detector_for_session(session_id: str) -> SpeechEndpointDetector:
-    detector=SpeechEndpointDetector(load_config().live)
+async def _realtime_partial_worker(websocket: WebSocket, send_lock: asyncio.Lock, session_id: str, cfg: AppConfig, state: dict):
+    """Process only the newest provisional speech snapshot; stale snapshots are dropped."""
+    while True:
+        await state["event"].wait()
+        state["event"].clear()
+        if state["closed"]:
+            return
+        result=state.get("latest")
+        token=state["token"]
+        if result is None:
+            continue
+        try:
+            source,detected=await transcribe_wav(result.wav_bytes,cfg.asr,language=cfg.academic.source_language,prompt=academic_hotwords(cfg.academic))
+        except Exception as exc:
+            logger.debug("Realtime partial ASR failed: %s", exc)
+            continue
+        if state["closed"] or token!=state["token"] or state.get("latest") is None:
+            continue
+        if not source:
+            continue
+        partial={"source":source,"translation":state.get("translation","") or "","start_ms":result.start_ms,"end_ms":result.end_ms,"language":detected}
+        async with send_lock:
+            try: await websocket.send_json({"type":"partial","phase":"asr","partial":partial})
+            except Exception: return
+
+        due=(result.duration_ms-state.get("last_translation_duration_ms",0))>=cfg.live.partial_translation_interval_ms
+        if not due:
+            continue
+        try:
+            translation=await translate_text(source,cfg.translation,cfg.academic,context=_translation_context(session_id,cfg))
+        except Exception as exc:
+            logger.debug("Realtime partial translation failed: %s", exc)
+            continue
+        if state["closed"] or token!=state["token"] or state.get("latest") is None:
+            continue
+        state["translation"]=translation
+        state["last_translation_duration_ms"]=result.duration_ms
+        partial["translation"]=translation
+        async with send_lock:
+            try: await websocket.send_json({"type":"partial","phase":"translation","partial":partial})
+            except Exception: return
+
+def _new_detector_for_session(session_id: str, cfg: AppConfig|None=None) -> SpeechEndpointDetector:
+    cfg=cfg or load_config()
+    detector=SpeechEndpointDetector(cfg.live)
     try:
         s=get_session(session_id)
         if s.segments: detector._clock_ms=float(max(seg.end_ms for seg in s.segments))
@@ -217,21 +260,45 @@ def _new_detector_for_session(session_id: str) -> SpeechEndpointDetector:
     return detector
 
 async def _run_pcm_stream(websocket: WebSocket, session_id: str, pcm_source, recorder: SessionAudioRecorder|None=None, send_ready: bool=True):
-    detector=_new_detector_for_session(session_id); send_lock=asyncio.Lock(); tasks:set[asyncio.Task]=set(); sequence=0
-    if send_ready: await websocket.send_json({"type":"ready","session_id":session_id})
+    cfg=load_config(); detector=_new_detector_for_session(session_id,cfg); send_lock=asyncio.Lock(); tasks:set[asyncio.Task]=set(); sequence=0
+    realtime=cfg.live.output_mode=="realtime"
+    partial_state={"event":asyncio.Event(),"latest":None,"token":0,"closed":False,"translation":"","last_translation_duration_ms":0}
+    partial_task=asyncio.create_task(_realtime_partial_worker(websocket,send_lock,session_id,cfg,partial_state)) if realtime else None
+    last_partial_speech_ms: float|None=None
+    if send_ready: await websocket.send_json({"type":"ready","session_id":session_id,"output_mode":cfg.live.output_mode})
     try:
         async for pcm in pcm_source:
             if pcm is None: break
             if recorder: recorder.write(pcm)
             level,result=detector.feed(pcm); await websocket.send_json({"type":"level","value":level,"speech":detector.in_speech})
             if result:
-                sequence+=1; task=asyncio.create_task(_process_live_segment(websocket,send_lock,session_id,result,sequence)); tasks.add(task); task.add_done_callback(tasks.discard)
+                if realtime:
+                    partial_state["token"]+=1; partial_state["latest"]=None; partial_state["translation"]=""; partial_state["last_translation_duration_ms"]=0; partial_state["event"].set(); last_partial_speech_ms=None
+                sequence+=1; task=asyncio.create_task(_process_live_segment(websocket,send_lock,session_id,result,sequence,cfg)); tasks.add(task); task.add_done_callback(tasks.discard)
                 await websocket.send_json({"type":"processing","sequence":sequence,"duration_ms":result.duration_ms})
+                continue
+            if realtime and detector.in_speech and detector._speech_ms>=cfg.live.realtime_min_audio_ms:
+                first_partial=last_partial_speech_ms is None
+                interval_due=not first_partial and detector._speech_ms-last_partial_speech_ms>=cfg.live.partial_interval_ms
+                if first_partial or interval_due:
+                    snapshot=detector.snapshot()
+                    if snapshot:
+                        partial_state["token"]+=1
+                        partial_state["latest"]=snapshot
+                        partial_state["event"].set()
+                        last_partial_speech_ms=detector._speech_ms
+            elif not detector.in_speech:
+                last_partial_speech_ms=None
     finally:
         tail=detector.flush()
+        if realtime:
+            partial_state["token"]+=1; partial_state["latest"]=None; partial_state["translation"]=""; partial_state["event"].set()
         if tail:
-            sequence+=1; task=asyncio.create_task(_process_live_segment(websocket,send_lock,session_id,tail,sequence)); tasks.add(task)
+            sequence+=1; task=asyncio.create_task(_process_live_segment(websocket,send_lock,session_id,tail,sequence,cfg)); tasks.add(task); task.add_done_callback(tasks.discard)
         if tasks: await asyncio.gather(*list(tasks),return_exceptions=True)
+        if partial_task:
+            partial_state["closed"]=True; partial_state["token"]+=1; partial_state["event"].set()
+            await asyncio.gather(partial_task,return_exceptions=True)
         if recorder:
             filename=await asyncio.to_thread(recorder.close)
             if filename: add_audio_file(session_id,filename)
@@ -271,7 +338,7 @@ async def native_ws(websocket: WebSocket):
         await websocket.send_json({"type":"error","stage":"capture","message":str(exc)})
         await websocket.close(code=1011)
         return
-    await websocket.send_json({"type":"ready","session_id":session_id})
+    await websocket.send_json({"type":"ready","session_id":session_id,"output_mode":cfg.live.output_mode})
     async def native_source():
         while True:
             pcm=await queue.get()

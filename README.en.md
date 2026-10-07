@@ -11,6 +11,7 @@ The project combines live audio capture, ASR, translation, and academic note-tak
 Main features:
 
 - Real-time side-by-side original text and translation with synchronized scrolling and follow-to-latest behavior
+- Sentence output and experimental realtime incremental output; realtime mode updates provisional transcription and translation during speech, then stores only the finalized result in the Session
 - Local Whisper ASR: `tiny`, `base`, `small`, `medium`, and `large-v3-turbo`
 - MLX / Metal acceleration on Apple silicon, CUDA support on Windows NVIDIA systems, and CPU fallback elsewhere
 - Bing Free, Microsoft Translator, and OpenAI-compatible translation providers
@@ -19,6 +20,7 @@ Main features:
 - Windows WASAPI loopback and native microphone capture
 - Audio and video file transcription and translation
 - Experimental bilingual floating subtitle window for Zoom, WebEx, browser classes, or presentations
+- Custom speech segmentation, realtime update intervals, translation context, terminology preservation, and capture/storage settings with persistent local configuration
 - Academic glossary, markers, notes, screenshots, and searchable Session Library
 - TXT, Markdown, SRT, and JSON export
 - Portable-by-default storage: `.venv/`, `data/`, `models/`, `runtime/`, `cache/`, and `logs/` stay inside the project directory
@@ -97,10 +99,11 @@ http://127.0.0.1:8765
 ### After startup
 
 1. Open the **Live** workspace and choose an audio source.
-2. Select source and target languages.
+2. Select source and target languages, then choose **Sentence mode** or the experimental **Realtime** mode. Sentence mode is the default.
 3. Click **Start listening**.
-4. Original text and translation are written to the current Session in real time.
+4. Original text and translation appear in the current Session. Realtime provisional results are display-only and are replaced by the finalized result when the speech segment ends.
 5. To use another ASR or translation service, configure Local Whisper, Microsoft Translator, or an OpenAI-compatible provider under **Settings**.
-6. For single-screen Zoom, WebEx, or browser-course use, enable the **Experimental** floating window to keep original text and translation above other windows.
+6. Fine-tune speech detection, segmentation, realtime updates, translation, and capture/storage behavior under **Settings → Custom settings**. Saved values are restored on the next launch.
+7. For single-screen Zoom, WebEx, or browser-course use, enable the **Experimental** floating window to keep original text and translation above other windows.
 
 Sessions, models, caches, recordings, and screenshots are stored inside the project directory by default, so the whole installation can be moved or removed as one folder.

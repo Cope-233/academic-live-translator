@@ -62,6 +62,12 @@ class SpeechEndpointDetector:
         self._clock_ms+=chunk_ms
         if self.in_speech and ((self._silence_ms>=self.cfg.silence_ms and self._speech_ms>=self.cfg.min_speech_ms) or self._speech_ms>=self.cfg.max_segment_ms): return level,self._finalize()
         return level,None
+    def snapshot(self):
+        """Return the current in-progress utterance without finalizing it."""
+        if not self.in_speech or self._speech_ms < self.cfg.min_speech_ms or not self._speech_chunks:
+            return None
+        pcm=b"".join(self._speech_chunks); duration=int(self._speech_ms); start=int(self._segment_start_ms)
+        return EndpointResult(pcm16_to_wav_bytes(pcm,self.cfg.sample_rate),duration,start,start+duration)
     def flush(self):
         if self.in_speech and self._speech_ms>=self.cfg.min_speech_ms: return self._finalize()
         self._reset(); return None
