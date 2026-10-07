@@ -3,12 +3,89 @@
   const ASR_MODES = ['local_whisper', 'openai_chat'];
   const TRANSLATION_MODES = ['bing_web', 'azure_translator', 'openai_chat'];
 
-  // ASR results are rendered immediately; translation updates the same segment
-  // later instead of being required before original text appears.
+  Object.assign(I18N['zh-CN'], {
+    customSettings:'自定义设置', customSettingsHint:'以下参数都有可直接使用的默认值。修改后会保存到本地配置，下次启动自动恢复。',
+    outputMode:'输出模式', sentenceMode:'整句模式', realtimeMode:'实时模式 · Experimental',
+    translationSettings:'语言与翻译', contextSegments:'上下文片段数', preserveTerms:'保护学术术语',
+    speechSegmentation:'语音检测与分段', speechThreshold:'语音触发阈值', silenceEnd:'停顿结束阈值 (ms)', minSpeech:'最短语音长度 (ms)', maxSegment:'最长语音片段 (ms)', preRoll:'前置音频保留 (ms)',
+    realtimeSettings:'实时模式', realtimeSettingsHint:'实时模式使用增量 ASR 和节流后的增量翻译。数值越小延迟越低，但本地推理和网络请求会更频繁。', realtimeMinAudio:'首次增量识别等待 (ms)', partialInterval:'ASR 更新间隔 (ms)', partialTranslationInterval:'翻译更新间隔 (ms)',
+    captureStorage:'采集与保存', audioFormat:'音频格式', screenshotMonitor:'截图显示器编号', livePartial:'实时识别中'
+  });
+  Object.assign(I18N.en, {
+    customSettings:'Custom settings', customSettingsHint:'Every option has a usable default. Changes are stored in the local config and restored on the next launch.',
+    outputMode:'Output mode', sentenceMode:'Sentence mode', realtimeMode:'Realtime · Experimental',
+    translationSettings:'Language & translation', contextSegments:'Context segments', preserveTerms:'Preserve academic terms',
+    speechSegmentation:'Speech detection & segmentation', speechThreshold:'Speech threshold', silenceEnd:'Silence endpoint (ms)', minSpeech:'Minimum speech (ms)', maxSegment:'Maximum segment (ms)', preRoll:'Pre-roll audio (ms)',
+    realtimeSettings:'Realtime mode', realtimeSettingsHint:'Realtime mode uses incremental ASR and throttled incremental translation. Lower values reduce latency but increase local inference and network requests.', realtimeMinAudio:'First partial after (ms)', partialInterval:'ASR update interval (ms)', partialTranslationInterval:'Translation update interval (ms)',
+    captureStorage:'Capture & storage', audioFormat:'Audio format', screenshotMonitor:'Screenshot monitor', livePartial:'Live recognition'
+  });
+
+  state.livePartial = null;
+
+  function renderPartialUi() {
+    const partial = state.livePartial;
+    const original = $('originalList');
+    const translation = $('translationList');
+    original?.querySelectorAll('.partial-segment').forEach(node => node.remove());
+    translation?.querySelectorAll('.partial-segment').forEach(node => node.remove());
+
+    if (partial && original && translation) {
+      original.classList.remove('empty');
+      translation.classList.remove('empty');
+      if (!state.session?.segments?.length) {
+        original.textContent = '';
+        translation.textContent = '';
+      }
+      const stamp = fmt(partial.start_ms || 0);
+      original.insertAdjacentHTML('beforeend', `<div class="segment partial-segment"><small>${stamp} · ${esc(tr('livePartial'))}</small>${esc(partial.source || '…')}</div>`);
+      translation.insertAdjacentHTML('beforeend', `<div class="segment partial-segment"><small>${stamp} · ${esc(tr('livePartial'))}</small>${esc(partial.translation || '…')}</div>`);
+      if (state.autoFollow) {
+        requestAnimationFrame(() => {
+          original.scrollTop = original.scrollHeight;
+          translation.scrollTop = translation.scrollHeight;
+        });
+      }
+    }
+
+    if (floatingWindowIsOpen()) {
+      const list = state.floatingWindow.document.querySelector('[data-role="floating-list"]');
+      list?.querySelectorAll('[data-partial="true"]').forEach(node => node.remove());
+      if (partial && list) {
+        const row = state.floatingWindow.document.createElement('div');
+        row.className = 'row partial-row';
+        row.dataset.partial = 'true';
+        const stamp = fmt(partial.start_ms || 0);
+        row.innerHTML = `<div class="cell"><small class="time">${stamp} · ${esc(tr('livePartial'))}</small>${esc(partial.source || '…')}</div><div class="cell"><small class="time">${stamp} · ${esc(tr('livePartial'))}</small>${esc(partial.translation || '…')}</div>`;
+        list.appendChild(row);
+        if (state.floatingAutoFollow) list.scrollTop = list.scrollHeight;
+      }
+    }
+  }
+
+  const baseRenderSession = renderSession;
+  renderSession = function renderSessionBeta08(options = {}) {
+    baseRenderSession(options);
+    renderPartialUi();
+  };
+
+  // Final ASR remains a durable session segment. Realtime partials are visual-only
+  // and are replaced by the final segment once the endpoint is reached.
   const baseHandleWs = handleWs;
-  handleWs = function handleWsBeta07(event) {
+  handleWs = function handleWsBeta08(event) {
     let message = null;
     try { message = JSON.parse(event.data); } catch {}
+
+    if (message?.type === 'partial' && state.session) {
+      state.livePartial = { ...(state.livePartial || {}), ...(message.partial || {}) };
+      renderPartialUi();
+      return;
+    }
+
+    if (message?.type === 'segment') {
+      state.livePartial = null;
+      baseHandleWs(event);
+      return;
+    }
 
     if (message?.type === 'segment_update' && state.session) {
       const updated = message.segment;
@@ -17,6 +94,11 @@
       else if (updated) state.session.segments.push(updated);
       renderSession();
       return;
+    }
+
+    if (message?.type === 'stopped') {
+      state.livePartial = null;
+      renderPartialUi();
     }
 
     baseHandleWs(event);
@@ -191,6 +273,21 @@
     updateProviderBadges();
   }
 
+  function restoreCustomSettings(config) {
+    const live = config.live || {};
+    const academic = config.academic || {};
+    const capture = config.capture || {};
+    $('liveOutputMode').value = live.output_mode || 'sentence';
+    $('speechThreshold').value = live.speech_threshold ?? 0.010;
+    $('preRollMs').value = live.pre_roll_ms ?? 220;
+    $('realtimeMinAudioMs').value = live.realtime_min_audio_ms ?? 900;
+    $('partialIntervalMs').value = live.partial_interval_ms ?? 1000;
+    $('partialTranslationIntervalMs').value = live.partial_translation_interval_ms ?? 1800;
+    $('contextSegments').value = academic.context_segments ?? 1;
+    $('preserveAcademicTerms').value = String(academic.preserve_academic_terms ?? true);
+    $('screenshotMonitor').value = capture.screenshot_monitor ?? 1;
+  }
+
   function switchAsrProfile() {
     if (!state.config) return providerUI();
     const p = ensureProviderProfiles(state.config);
@@ -238,27 +335,48 @@
   }
 
   const baseLoadConfig = loadConfig;
-  loadConfig = async function loadConfigBeta07() {
+  loadConfig = async function loadConfigBeta08() {
     const config = await baseLoadConfig();
     restoreProviderUi(config);
+    restoreCustomSettings(config);
+    applyLanguage(config.interface?.language || 'zh-CN');
     return config;
   };
 
   const baseFormConfig = formConfig;
-  formConfig = function formConfigBeta07() {
+  formConfig = function formConfigBeta08() {
     captureCurrentProviderProfiles();
     const c = baseFormConfig();
     const p = ensureProviderProfiles(state.config);
     c.providers = clone(p);
     c.asr = clone(p.asr[p.active_asr]);
     c.translation = clone(p.translation[p.active_translation]);
+    c.live.output_mode = $('liveOutputMode').value || 'sentence';
+    c.live.speech_threshold = Number($('speechThreshold').value) || 0.010;
+    c.live.pre_roll_ms = Number($('preRollMs').value) || 0;
+    c.live.realtime_min_audio_ms = Number($('realtimeMinAudioMs').value) || 900;
+    c.live.partial_interval_ms = Number($('partialIntervalMs').value) || 1000;
+    c.live.partial_translation_interval_ms = Number($('partialTranslationIntervalMs').value) || 1800;
+    c.academic.context_segments = Number($('contextSegments').value) || 0;
+    c.academic.preserve_academic_terms = $('preserveAcademicTerms').value === 'true';
+    c.capture.screenshot_monitor = Math.max(1, Number($('screenshotMonitor').value) || 1);
     return c;
+  };
+
+  const baseSyncLive = syncLive;
+  syncLive = async function syncLiveBeta08() {
+    await ensureConfigLoaded();
+    state.config.live.output_mode = $('liveOutputMode').value || 'sentence';
+    await baseSyncLive();
   };
 
   $('asrMode').onchange = switchAsrProfile;
   $('mtMode').onchange = switchTranslationProfile;
+  $('liveOutputMode').onchange = () => {
+    if (state.config) state.config.live.output_mode = $('liveOutputMode').value;
+  };
 
-  startNative = async function startNativeBeta07() {
+  startNative = async function startNativeBeta08() {
     const dev = $('nativeDevice').value;
     if (!dev) throw new Error(tr('noAudioDevice'));
 
@@ -340,24 +458,29 @@
     ws.onclose = null;
   };
 
-  // Keep the floating-window patch separate from the original function name to
-  // avoid the beta 0.6 temporal-dead-zone collision.
   const baseToggleFloatingWindow = toggleFloatingWindow;
-  const toggleFloatingWindowBeta07 = async () => {
+  const toggleFloatingWindowBeta08 = async () => {
     await baseToggleFloatingWindow();
     if (floatingWindowIsOpen()) {
-      state.floatingWindow.document.title = 'Academic Live Translator beta 0.7';
+      state.floatingWindow.document.title = 'Academic Live Translator beta 0.8';
+      const style = state.floatingWindow.document.createElement('style');
+      style.textContent = '.partial-row{opacity:.68;font-style:italic}';
+      state.floatingWindow.document.head.appendChild(style);
+      renderPartialUi();
     }
   };
-  $('floatingWindowBtn').onclick = toggleFloatingWindowBeta07;
-  $('floatingWindowSettingsBtn').onclick = toggleFloatingWindowBeta07;
+  $('floatingWindowBtn').onclick = toggleFloatingWindowBeta08;
+  $('floatingWindowSettingsBtn').onclick = toggleFloatingWindowBeta08;
 
-  document.title = 'Academic Live Translator beta 0.7';
+  document.title = 'Academic Live Translator beta 0.8';
   const brandVersion = document.querySelector('.brand span');
-  if (brandVersion) brandVersion.textContent = 'beta 0.7 · WebUI';
+  if (brandVersion) brandVersion.textContent = 'beta 0.8 · WebUI';
 
-  // beta 0.7 restores the persisted active providers immediately on startup
-  // instead of leaving the HTML's first-option Whisper/Bing placeholders visible.
-  if (state.config) restoreProviderUi(state.config);
-  else ensureConfigLoaded().catch(error => toast(`${tr('startupError')}: ${error.message}`));
+  if (state.config) {
+    restoreProviderUi(state.config);
+    restoreCustomSettings(state.config);
+    applyLanguage(state.config.interface?.language || 'zh-CN');
+  } else {
+    ensureConfigLoaded().catch(error => toast(`${tr('startupError')}: ${error.message}`));
+  }
 })();
