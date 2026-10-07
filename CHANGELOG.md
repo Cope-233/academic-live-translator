@@ -1,5 +1,20 @@
 # Changelog
 
+## beta 0.8 — 2026-10-07
+
+Customization and realtime-output beta focused on lower perceived latency and user-controlled live behavior.
+
+- Renamed **Academic & Capture** to **Custom Settings** and reorganized it into language/translation, speech segmentation, realtime, and capture/storage sections.
+- Exposed additional persistent settings including speech threshold, pre-roll, translation context segments, academic-term preservation, screenshot monitor, realtime startup delay, ASR partial interval, and translation partial interval.
+- All custom values are saved to the portable `data/config.json` and restored automatically on the next launch; existing beta 0.7 configs migrate through the normal model defaults without losing provider profiles.
+- Added an **Output mode** selector to the Live workspace with **Sentence mode** as the default and **Realtime · Experimental** as the optional low-latency mode.
+- Realtime mode performs incremental provisional ASR while speech is still in progress, then performs throttled provisional translation updates.
+- Added latest-snapshot scheduling for realtime ASR so stale partial jobs are dropped instead of building an inference queue.
+- Provisional realtime text is rendered in-place in the WebUI and floating window, visually distinguished from finalized text, and is never written to session history or exports.
+- Endpoint completion still triggers one final ASR pass and one final translation pass; only those final results are persisted.
+- Retained the existing sentence-mode pipeline unchanged for users who prefer maximum stability and lower compute/network usage.
+- Updated WebUI, startup labels, tests, example configuration, and release metadata to beta 0.8.
+
 ## beta 0.7 — 2026-10-07
 
 Persistent provider-profile beta focused on reliable local/remote configuration switching.
