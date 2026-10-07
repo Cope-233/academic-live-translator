@@ -4,6 +4,8 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 ProviderMode = Literal["local_whisper","openai_chat","bing_web","azure_translator"]
+AsrProviderMode = Literal["local_whisper","openai_chat"]
+TranslationProviderMode = Literal["bing_web","azure_translator","openai_chat"]
 SessionMode = Literal["live","media","lecture","meeting"]
 InputSource = Literal["microphone","browser_system","browser_mix","native_system","native_microphone","media_file"]
 MarkerKind = Literal["important","question","idea","reference","follow_up","note"]
@@ -21,6 +23,57 @@ class ProviderConfig(BaseModel):
     device: Literal["auto","cpu","cuda","apple"] = "auto"
     compute_type: str = "auto"
     region: str = ""
+
+
+def _default_asr_profiles() -> dict[str, ProviderConfig]:
+    return {
+        "local_whisper": ProviderConfig(
+            name="Local Whisper",
+            mode="local_whisper",
+            model="base",
+            device="auto",
+            compute_type="auto",
+        ),
+        "openai_chat": ProviderConfig(
+            name="OpenAI-compatible ASR",
+            mode="openai_chat",
+            base_url="http://127.0.0.1:8080/v1",
+            model="",
+        ),
+    }
+
+
+def _default_translation_profiles() -> dict[str, ProviderConfig]:
+    return {
+        "bing_web": ProviderConfig(
+            name="Bing Translate (Free)",
+            mode="bing_web",
+            model="bing",
+            temperature=0.0,
+        ),
+        "azure_translator": ProviderConfig(
+            name="Microsoft Translator",
+            mode="azure_translator",
+            base_url="https://api.cognitive.microsofttranslator.com",
+            model="translator-v3",
+            temperature=0.0,
+        ),
+        "openai_chat": ProviderConfig(
+            name="OpenAI-compatible Translation",
+            mode="openai_chat",
+            model="",
+            temperature=0.0,
+        ),
+    }
+
+
+class ProviderProfiles(BaseModel):
+    """Persistent provider-specific settings plus the currently active providers."""
+
+    active_asr: AsrProviderMode = "local_whisper"
+    active_translation: TranslationProviderMode = "bing_web"
+    asr: dict[str, ProviderConfig] = Field(default_factory=_default_asr_profiles)
+    translation: dict[str, ProviderConfig] = Field(default_factory=_default_translation_profiles)
 
 class LiveConfig(BaseModel):
     sample_rate: int = 16000
@@ -63,8 +116,10 @@ class AcademicConfig(BaseModel):
 
 class AppConfig(BaseModel):
     interface: InterfaceConfig = InterfaceConfig()
+    # Active-provider mirrors retained for runtime/backward compatibility.
     asr: ProviderConfig = ProviderConfig(name="Local Whisper",mode="local_whisper",model="base",device="auto",compute_type="auto")
     translation: ProviderConfig = ProviderConfig(name="Bing Translate (Free)",mode="bing_web",model="bing",temperature=0.0)
+    providers: ProviderProfiles = Field(default_factory=ProviderProfiles)
     live: LiveConfig = LiveConfig()
     capture: CaptureConfig = CaptureConfig()
     academic: AcademicConfig = AcademicConfig()
