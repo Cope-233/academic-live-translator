@@ -4,6 +4,7 @@ import pytest
 
 from app import install_assets
 from app import __version__
+from app.audio import SpeechEndpointDetector
 from app.models import AppConfig
 from app.config import CACHE_DIR, DATA_DIR, MODELS_DIR, PROJECT_ROOT, _migrate_config
 from app.native_capture import NativeAudioCapture, NativeCaptureInfo, _capture_candidates
@@ -14,7 +15,7 @@ from app import main
 
 
 def test_version():
-    assert __version__ == "beta 0.7"
+    assert __version__ == "beta 0.8"
 
 
 def test_defaults():
@@ -31,6 +32,45 @@ def test_defaults():
     assert cfg.providers.asr["openai_chat"].mode == "openai_chat"
     assert cfg.providers.translation["azure_translator"].mode == "azure_translator"
     assert cfg.academic.target_language == "Chinese"
+    assert cfg.live.output_mode == "sentence"
+    assert cfg.live.speech_threshold == 0.010
+    assert cfg.live.silence_ms == 420
+    assert cfg.live.pre_roll_ms == 220
+    assert cfg.live.realtime_min_audio_ms == 900
+    assert cfg.live.partial_interval_ms == 1000
+    assert cfg.live.partial_translation_interval_ms == 1800
+
+
+def test_realtime_output_mode_and_custom_settings_validate():
+    cfg = AppConfig(live={
+        "output_mode": "realtime",
+        "speech_threshold": 0.02,
+        "silence_ms": 300,
+        "min_speech_ms": 200,
+        "max_segment_ms": 8000,
+        "pre_roll_ms": 180,
+        "realtime_min_audio_ms": 700,
+        "partial_interval_ms": 800,
+        "partial_translation_interval_ms": 1500,
+    }, academic={"context_segments": 3, "preserve_academic_terms": False})
+    assert cfg.live.output_mode == "realtime"
+    assert cfg.live.speech_threshold == 0.02
+    assert cfg.live.partial_interval_ms == 800
+    assert cfg.academic.context_segments == 3
+    assert cfg.academic.preserve_academic_terms is False
+
+
+def test_speech_detector_snapshot_does_not_finalize_segment():
+    cfg = AppConfig(live={"speech_threshold": 0.001, "min_speech_ms": 100, "pre_roll_ms": 0}).live
+    detector = SpeechEndpointDetector(cfg)
+    pcm = (1000).to_bytes(2, byteorder="little", signed=True) * 3200  # 200 ms at 16 kHz
+    level, result = detector.feed(pcm)
+    assert level > cfg.speech_threshold
+    assert result is None
+    snapshot = detector.snapshot()
+    assert snapshot is not None
+    assert snapshot.duration_ms == 200
+    assert detector.in_speech is True
 
 
 def test_apple_silicon_auto_uses_mlx_and_cpu_stays_cpu(monkeypatch):
