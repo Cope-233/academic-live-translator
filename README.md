@@ -11,6 +11,7 @@ Academic Live Translator 是一个本地优先的实时语音转录、翻译与�
 主要功能：
 
 - 实时原文 / 译文双栏显示，支持同步滚动与自动跟随最新内容
+- 支持整句输出与实验性实时增量输出；实时模式会在讲话过程中更新临时识别与翻译，最终结果再写入 Session
 - 本地 Whisper ASR：`tiny`、`base`、`small`、`medium`、`large-v3-turbo`
 - Apple silicon 支持 MLX / Metal；Windows NVIDIA 支持 CUDA；其他环境可使用 CPU
 - 支持 Bing Free、Microsoft Translator 与 OpenAI-compatible 翻译服务
@@ -19,6 +20,7 @@ Academic Live Translator 是一个本地优先的实时语音转录、翻译与�
 - Windows WASAPI 系统音频回环与原生麦克风捕捉
 - 音频 / 视频文件转录与翻译
 - 实验性双语悬浮字幕窗，可覆盖 Zoom、WebEx、网页课程或演示文稿
+- 可自定义语音分段、实时更新频率、翻译上下文、术语保护与采集保存参数，设置会自动保存在本地配置中
 - 学术术语表、重点标记、笔记、截图与 Session Library
 - TXT、Markdown、SRT、JSON 导出
 - Portable-by-default：`.venv/`、`data/`、`models/`、`runtime/`、`cache/`、`logs/` 均保存在项目目录内
@@ -95,10 +97,11 @@ http://127.0.0.1:8765
 ### 启动后
 
 1. 在 **实时** 页面选择音频来源。
-2. 设置源语言与目标语言。
+2. 设置源语言与目标语言，并选择 **整句模式** 或实验性的 **实时模式**；默认使用整句模式。
 3. 点击 **开始监听**。
-4. 原文与翻译会实时写入当前 Session。
+4. 原文与翻译会显示在当前 Session；实时模式中的临时结果只用于即时显示，语音段结束后才保存最终结果。
 5. 需要更换 ASR 或翻译服务时，在 **设置** 中选择本地 Whisper、Microsoft Translator 或 OpenAI-compatible Provider。
-6. 单屏使用 Zoom、WebEx 或网页课程时，可启用标记为 **Experimental** 的悬浮窗，将原文与译文保持在其他窗口上方。
+6. 更细的语音检测、分段、实时更新、翻译与保存参数可在 **设置 → 自定义设置** 中调整，保存后下次启动会自动恢复。
+7. 单屏使用 Zoom、WebEx 或网页课程时，可启用标记为 **Experimental** 的悬浮窗，将原文与译文保持在其他窗口上方。
 
 本地会话、模型、缓存、录音和截图默认保存在当前项目目录中；迁移或删除程序时可直接管理整个项目文件夹。
